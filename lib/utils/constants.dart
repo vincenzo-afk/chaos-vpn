@@ -82,13 +82,15 @@ class ChannelMethods {
 class EffectDefaults {
   EffectDefaults._();
 
-  static const double gainFactor = 4.0;
-  static const double crackleProb = 0.03;
-  static const double dropoutProb = 0.06;
-  static const double softDrive = 4.0;
-  static const int bitDepth = 6;
-  static const double hardClipThreshold = 0.60;
-  static const double reverbMix = 0.45;
+  static const double gainBoost = 4.0;
+  static const double crackleIntensity = 0.03;
+  static const double dropoutRate = 0.06;
+  static const double fuzzDrive = 4.0;
+  static const int bitCrushDepth = 6;
+  static const double clipThreshold = 0.60;
+  static const double reverbRoomSize = 0.45;
+  static const double echoDelay = 100.0;
+  static const double echoDecay = 1.0;
   static const double echoMixDry = 0.70;
   static const double echoMix100 = 0.40;
   static const double echoMix250 = 0.25;

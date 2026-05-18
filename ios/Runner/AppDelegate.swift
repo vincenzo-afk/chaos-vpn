@@ -87,11 +87,11 @@ import AVFoundation
         if let gain = args["gain"] as? Double {
             manager.updateGain(Float(gain))
         }
-        if let crackleProb = args["crackleProb"] as? Double {
-            manager.crackleProb = Float(crackleProb)
+        if let crackleIntensity = args["crackleIntensity"] as? Double {
+            manager.crackleProb = Float(crackleIntensity)
         }
-        if let dropoutProb = args["dropoutProb"] as? Double {
-            manager.dropoutProb = Float(dropoutProb)
+        if let dropoutRate = args["dropoutRate"] as? Double {
+            manager.dropoutProb = Float(dropoutRate)
         }
         result(nil)
     }

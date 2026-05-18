@@ -6,13 +6,12 @@ import Foundation
  *
  * Chain: Mic Input → Gain → Bandpass EQ → Distortion → Reverb → Delay → Output
  *
- * The processed audio is routed back to the output bus for VoIP/communication apps.
+ * Interruption handling: registers for AVAudioSession.interruptionNotification
+ * and restarts the engine automatically after interruptions end.
  *
  * LIMITATION: iOS does not expose a true system-wide virtual microphone API.
  * This implementation works with VoIP/communication apps (WhatsApp, FaceTime,
  * Discord via CallKit) using AVAudioSession mode .voiceChat.
- * Full system-wide routing is not possible on iOS without a Broadcast Upload
- * Extension or Audio Unit Extensions (requires Enterprise distribution).
  */
 class AudioEngineManager {
 
@@ -37,6 +36,7 @@ class AudioEngineManager {
     // Chaos state
     private(set) var isActive = false
     private var pitchWobbleTimer: Timer?
+    private var interruptionObserver: NSObjectProtocol?
 
     // MARK: - Setup
 
@@ -46,6 +46,10 @@ class AudioEngineManager {
         guard !isActive else { return }
 
         let session = AVAudioSession.sharedInstance()
+
+        // Register interruption handler BEFORE activating session
+        registerInterruptionHandler(session: session)
+
         try session.setCategory(
             .playAndRecord,
             mode: .voiceChat,
@@ -127,6 +131,64 @@ class AudioEngineManager {
         print("[AudioEngineManager] Engine started")
     }
 
+    // MARK: - Interruption Handling
+
+    private func registerInterruptionHandler(session: AVAudioSession) {
+        // Remove any previous observer first
+        if let observer = interruptionObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
+
+        interruptionObserver = NotificationCenter.default.addObserver(
+            forName: AVAudioSession.interruptionNotification,
+            object: session,
+            queue: .main
+        ) { [weak self] notification in
+            guard let self = self,
+                  let userInfo = notification.userInfo,
+                  let typeValue = userInfo[AVAudioSessionInterruptionTypeKey] as? UInt,
+                  let type = AVAudioSession.InterruptionType(rawValue: typeValue)
+            else { return }
+
+            switch type {
+            case .began:
+                print("[AudioEngineManager] Interruption began — pausing")
+                // Engine will be stopped by the system automatically
+                self.pitchWobbleTimer?.invalidate()
+                self.pitchWobbleTimer = nil
+
+            case .ended:
+                print("[AudioEngineManager] Interruption ended — restarting")
+                guard let optionsValue = userInfo[AVAudioSessionInterruptionOptionKey] as? UInt else {
+                    return
+                }
+                let options = AVAudioSession.InterruptionOptions(rawValue: optionsValue)
+                if options.contains(.shouldResume) {
+                    self.restartEngine()
+                }
+
+            @unknown default:
+                break
+            }
+        }
+    }
+
+    private func restartEngine() {
+        do {
+            try AVAudioSession.sharedInstance().setActive(true)
+            try engine?.start()
+            isActive = true
+            startPitchWobble()
+            print("[AudioEngineManager] Engine restarted after interruption")
+        } catch {
+            print("[AudioEngineManager] Failed to restart engine: \(error.localizedDescription)")
+            // Retry once after a short delay
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
+                self?.restartEngine()
+            }
+        }
+    }
+
     // MARK: - Chaos PCM Tap
 
     private func installChaosTap(on node: AVAudioMixerNode, format: AVAudioFormat) {
@@ -178,6 +240,13 @@ class AudioEngineManager {
         guard isActive else { return }
         pitchWobbleTimer?.invalidate()
         pitchWobbleTimer = nil
+
+        // Remove interruption observer
+        if let observer = interruptionObserver {
+            NotificationCenter.default.removeObserver(observer)
+            interruptionObserver = nil
+        }
+
         engine?.stop()
         engine = nil
         isActive = false

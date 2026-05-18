@@ -5,9 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.media.*
-import android.os.Build
-import android.os.IBinder
-import android.os.PowerManager
+import android.os.*
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import java.util.concurrent.atomic.AtomicBoolean
@@ -42,10 +40,10 @@ class VirtualMicService : Service() {
 
         // DSP parameters (updatable from Flutter via MethodChannel)
         @Volatile var gainFactor: Float = 4.0f
-        @Volatile var crackleProb: Float = 0.03f
-        @Volatile var dropoutProb: Float = 0.06f
-        @Volatile var hardClipThreshold: Float = 0.60f
-        @Volatile var bitDepth: Int = 6
+        @Volatile var crackleIntensity: Float = 0.03f
+        @Volatile var dropoutRate: Float = 0.06f
+        @Volatile var clipThreshold: Float = 0.60f
+        @Volatile var bitCrushDepth: Int = 6
 
         @Volatile var isRunning: Boolean = false
             private set
@@ -76,12 +74,12 @@ class VirtualMicService : Service() {
         /** Update DSP parameters from Flutter. */
         fun applyParams(args: Map<String, Any>) {
             gainFactor = (args["gain"] as? Double)?.toFloat() ?: gainFactor
-            crackleProb = (args["crackleProb"] as? Double)?.toFloat() ?: crackleProb
-            dropoutProb = (args["dropoutProb"] as? Double)?.toFloat() ?: dropoutProb
-            bitDepth = (args["bitDepth"] as? Int) ?: bitDepth
-            hardClipThreshold = (args["hardClipThreshold"] as? Double)?.toFloat()
-                ?: hardClipThreshold
-            Log.d(TAG, "DSP params updated: gain=$gainFactor, bitDepth=$bitDepth")
+            crackleIntensity = (args["crackleIntensity"] as? Double)?.toFloat() ?: crackleIntensity
+            dropoutRate = (args["dropoutRate"] as? Double)?.toFloat() ?: dropoutRate
+            bitCrushDepth = (args["bitCrushDepth"] as? Int) ?: bitCrushDepth
+            clipThreshold = (args["clipThreshold"] as? Double)?.toFloat()
+                ?: clipThreshold
+            Log.d(TAG, "DSP params updated: gain=$gainFactor, bitCrushDepth=$bitCrushDepth")
         }
     }
 
@@ -183,32 +181,44 @@ class VirtualMicService : Service() {
         val minBufferIn = AudioRecord.getMinBufferSize(SAMPLE_RATE, CHANNEL_IN, ENCODING)
         val bufferSize = maxOf(minBufferIn, 3200) // ~200ms at 16kHz
 
-        audioRecord = AudioRecord(
-            MediaRecorder.AudioSource.MIC,
-            SAMPLE_RATE,
-            CHANNEL_IN,
-            ENCODING,
-            bufferSize
-        )
+        audioRecord = try {
+            AudioRecord(
+                MediaRecorder.AudioSource.MIC,
+                SAMPLE_RATE,
+                CHANNEL_IN,
+                ENCODING,
+                bufferSize
+            )
+        } catch (e: IllegalArgumentException) {
+            Log.e(TAG, "Failed to create AudioRecord: ${e.message}")
+            stopVirtualMic()
+            return
+        }
 
         val minBufferOut = AudioTrack.getMinBufferSize(SAMPLE_RATE, CHANNEL_OUT, ENCODING)
-        audioTrack = AudioTrack.Builder()
-            .setAudioAttributes(
-                AudioAttributes.Builder()
-                    .setUsage(AudioAttributes.USAGE_VOICE_COMMUNICATION)
-                    .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-                    .build()
-            )
-            .setAudioFormat(
-                AudioFormat.Builder()
-                    .setSampleRate(SAMPLE_RATE)
-                    .setEncoding(ENCODING)
-                    .setChannelMask(CHANNEL_OUT)
-                    .build()
-            )
-            .setBufferSizeInBytes(maxOf(minBufferOut, bufferSize))
-            .setTransferMode(AudioTrack.MODE_STREAM)
-            .build()
+        audioTrack = try {
+            AudioTrack.Builder()
+                .setAudioAttributes(
+                    AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_VOICE_COMMUNICATION)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                        .build()
+                )
+                .setAudioFormat(
+                    AudioFormat.Builder()
+                        .setSampleRate(SAMPLE_RATE)
+                        .setEncoding(ENCODING)
+                        .setChannelMask(CHANNEL_OUT)
+                        .build()
+                )
+                .setBufferSizeInBytes(maxOf(minBufferOut, bufferSize))
+                .setTransferMode(AudioTrack.MODE_STREAM)
+                .build()
+        } catch (e: UnsupportedOperationException) {
+            Log.e(TAG, "Failed to create AudioTrack: ${e.message}")
+            stopVirtualMic()
+            return
+        }
 
         // Route audio through voice communication mode
         val audioManager = getSystemService(AUDIO_SERVICE) as AudioManager
@@ -221,7 +231,10 @@ class VirtualMicService : Service() {
         audioTrack?.play()
 
         processingThread = Thread { runAudioLoop(bufferSize) }.apply {
-            priority = Thread.MAX_PRIORITY
+            // Use Android audio thread priority for low-latency processing
+            android.os.Process.setThreadPriority(
+                android.os.Process.THREAD_PRIORITY_URGENT_AUDIO
+            )
             name = "ChaosVoice-DSP"
             start()
         }
@@ -271,22 +284,62 @@ class VirtualMicService : Service() {
 
         while (isRunningFlag.get()) {
             try {
-                val read = audioRecord?.read(buffer, 0, buffer.size) ?: break
-                if (read <= 0) {
-                    // Sleep briefly to avoid busy-looping on error
-                    Thread.sleep(10)
-                    continue
+                val read = audioRecord?.read(buffer, 0, buffer.size)
+                    ?: break
+
+                when {
+                    read == AudioRecord.ERROR_BAD_VALUE -> {
+                        Log.w(TAG, "AudioRecord ERROR_BAD_VALUE — reinitializing")
+                        Thread.sleep(50)
+                        recreateAudioRecord()
+                        continue
+                    }
+                    read == AudioRecord.ERROR_INVALID_OPERATION -> {
+                        Log.w(TAG, "AudioRecord ERROR_INVALID_OPERATION — reinitializing")
+                        Thread.sleep(50)
+                        recreateAudioRecord()
+                        continue
+                    }
+                    read <= 0 -> {
+                        // No data yet, brief sleep to avoid busy loop
+                        Thread.sleep(10)
+                        continue
+                    }
                 }
 
                 // Apply native-side DSP
                 val processed = applyNativeDSP(buffer, read)
 
                 // Write processed PCM to AudioTrack → loopback
-                audioTrack?.write(processed, 0, read)
+                val written = audioTrack?.write(processed, 0, read)
+                if (written != null && written < 0) {
+                    Log.w(TAG, "AudioTrack write error: $written")
+                }
             } catch (e: Exception) {
                 Log.e(TAG, "Error in audio loop: ${e.message}")
                 if (!isRunningFlag.get()) break
+                Thread.sleep(20)
             }
+        }
+    }
+
+    /// Recreate AudioRecord after error (buffer overflow / bad value).
+    private fun recreateAudioRecord() {
+        try {
+            audioRecord?.release()
+            val minBuffer = AudioRecord.getMinBufferSize(SAMPLE_RATE, CHANNEL_IN, ENCODING)
+            val bufferSize = maxOf(minBuffer, 3200)
+            audioRecord = AudioRecord(
+                MediaRecorder.AudioSource.MIC,
+                SAMPLE_RATE,
+                CHANNEL_IN,
+                ENCODING,
+                bufferSize
+            )
+            audioRecord?.startRecording()
+            Log.d(TAG, "AudioRecord reinitialized successfully")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to reinitialize AudioRecord: ${e.message}")
         }
     }
 
@@ -300,13 +353,13 @@ class VirtualMicService : Service() {
         val rng = Random
 
         // Dropout: silence entire chunk?
-        if (rng.nextFloat() < dropoutProb) {
+        if (rng.nextFloat() < dropoutRate) {
             return ShortArray(count) // all zeros
         }
 
         val maxInt16 = 32767.0f
-        val clipLevel = (hardClipThreshold * maxInt16).toInt()
-        val steps = (2.0.pow(bitDepth - 1)).toFloat()
+        val clipLevel = (clipThreshold * maxInt16).toInt()
+        val steps = (2.0.pow(bitCrushDepth - 1)).toFloat()
 
         for (i in 0 until count) {
             var sample = output[i].toFloat()
@@ -329,7 +382,7 @@ class VirtualMicService : Service() {
             sample = (sample / clipLevel.toFloat()) * maxInt16
 
             // 3. Crackle Noise
-            if (rng.nextFloat() < crackleProb) {
+            if (rng.nextFloat() < crackleIntensity) {
                 val impulse = if (rng.nextBoolean()) maxInt16 else -maxInt16
                 sample = (sample + impulse * 0.85f).coerceIn(-maxInt16, maxInt16)
             }

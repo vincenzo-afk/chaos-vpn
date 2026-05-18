@@ -50,5 +50,5 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   assets:
-    - assets/audio/impulse_response.wav
-    - assets/images/chaos_logo.png
+    - assets/audio/
+    - assets/images/

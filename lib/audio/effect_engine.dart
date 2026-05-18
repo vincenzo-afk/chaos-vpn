@@ -17,20 +17,23 @@ class EffectEngine {
   final Random _rng = Random();
 
   // Effect parameters (adjustable from UI)
-  double gainFactor = EffectDefaults.gainFactor;
-  double crackleProb = EffectDefaults.crackleProb;
-  double dropoutProb = EffectDefaults.dropoutProb;
-  double softDrive = EffectDefaults.softDrive;
-  int bitDepth = EffectDefaults.bitDepth;
-  double hardClipThreshold = EffectDefaults.hardClipThreshold;
-  double reverbMix = EffectDefaults.reverbMix;
+  double gainBoost = EffectDefaults.gainBoost;
+  double crackleIntensity = EffectDefaults.crackleIntensity;
+  double dropoutRate = EffectDefaults.dropoutRate;
+  double fuzzDrive = EffectDefaults.fuzzDrive;
+  int bitCrushDepth = EffectDefaults.bitCrushDepth;
+  double clipThreshold = EffectDefaults.clipThreshold;
+  double reverbRoomSize = EffectDefaults.reverbRoomSize;
+  double echoDelay = EffectDefaults.echoDelay;
+  double echoDecay = EffectDefaults.echoDecay;
 
   // Effect toggle flags
+  bool masterEnabled = true;
   bool gainEnabled = true;
-  bool bandpassEnabled = true;
+  bool radioFilterEnabled = true;
   bool bitCrushEnabled = true;
-  bool softClipEnabled = true;
-  bool hardClipEnabled = true;
+  bool fuzzEnabled = true;
+  bool clipEnabled = true;
   bool echoEnabled = true;
   bool reverbEnabled = true;
   bool crackleEnabled = true;
@@ -63,18 +66,21 @@ class EffectEngine {
 
   /// Update all effect parameters from a settings object.
   void updateFromSettings(EffectSettings settings) {
-    gainFactor = settings.gainFactor;
-    crackleProb = settings.crackleProb;
-    dropoutProb = settings.dropoutProb;
-    softDrive = settings.softDrive;
-    bitDepth = settings.bitDepth;
-    hardClipThreshold = settings.hardClipThreshold;
-    reverbMix = settings.reverbMix;
-    gainEnabled = settings.gainEnabled;
-    bandpassEnabled = settings.bandpassEnabled;
+    masterEnabled = settings.masterEnabled;
+    gainBoost = settings.gainBoost;
+    crackleIntensity = settings.crackleIntensity;
+    dropoutRate = settings.dropoutRate;
+    fuzzDrive = settings.fuzzDrive;
+    bitCrushDepth = settings.bitCrushDepth;
+    clipThreshold = settings.clipThreshold;
+    reverbRoomSize = settings.reverbRoomSize;
+    echoDelay = settings.echoDelay;
+    echoDecay = settings.echoDecay;
+    gainEnabled = settings.gainBoost > 0 && settings.masterEnabled;
+    radioFilterEnabled = settings.radioFilterEnabled;
     bitCrushEnabled = settings.bitCrushEnabled;
-    softClipEnabled = settings.softClipEnabled;
-    hardClipEnabled = settings.hardClipEnabled;
+    fuzzEnabled = settings.fuzzEnabled;
+    clipEnabled = settings.clipEnabled;
     echoEnabled = settings.echoEnabled;
     reverbEnabled = settings.reverbEnabled;
     crackleEnabled = settings.crackleEnabled;
@@ -95,16 +101,16 @@ class EffectEngine {
     if (gainEnabled) _applyGainBoost(samples);
 
     // Effect 8: Bandpass Filter (300–3400 Hz — telephone effect)
-    if (bandpassEnabled) _bandpass.process(samples);
+    if (radioFilterEnabled) _bandpass.process(samples);
 
     // Effect 6: Bit Crusher (6-bit quantization)
     if (bitCrushEnabled) _applyBitCrusher(samples);
 
     // Effect 5: Soft Clip / Overdrive Distortion
-    if (softClipEnabled) _applySoftClip(samples);
+    if (fuzzEnabled) _applySoftClip(samples);
 
     // Effect 10: Hard Clipping at 60% threshold
-    if (hardClipEnabled) _applyHardClip(samples);
+    if (clipEnabled) _applyHardClip(samples);
 
     // Effect 2: Multi-tap Echo Delay (100ms + 250ms)
     if (echoEnabled) _applyEcho(samples);
@@ -116,11 +122,11 @@ class EffectEngine {
     if (crackleEnabled) _applyCrackleNoise(samples);
 
     // Effect 4: Voice Dropout (chunk-level silence)
-    _dropoutActive = false;
     if (dropoutEnabled) _applyDropout(samples);
 
-    // Effect 7: Pitch Wobble (±3 semitones random)
+    // Effect 7: Pitch Wobble (configurable range)
     if (pitchWobbleEnabled) {
+      _pitch.range = pitchWobbleRange;
       final wobbled = _pitch.process(samples);
       // Ensure output length matches input
       final padded = PcmUtils.padOrTrim(wobbled, input.length);
@@ -137,13 +143,13 @@ class EffectEngine {
   // ═══════════════════════════ Effect 1: Gain Boost ═══════════════════════════
   void _applyGainBoost(List<double> samples) {
     for (int i = 0; i < samples.length; i++) {
-      samples[i] = (samples[i] * gainFactor).clamp(-1.0, 1.0);
+      samples[i] = (samples[i] * gainBoost).clamp(-1.0, 1.0);
     }
   }
 
   // ═══════════════════════════ Effect 6: Bit Crusher ══════════════════════════
   void _applyBitCrusher(List<double> samples) {
-    final steps = pow(2, bitDepth - 1).toDouble();
+    final steps = pow(2, bitCrushDepth - 1).toDouble();
     for (int i = 0; i < samples.length; i++) {
       samples[i] = (samples[i] * steps).roundToDouble() / steps;
     }
@@ -152,7 +158,7 @@ class EffectEngine {
   // ══════════════════════════ Effect 5: Soft Clip ══════════════════════════════
   void _applySoftClip(List<double> samples) {
     for (int i = 0; i < samples.length; i++) {
-      final driven = samples[i] * softDrive;
+      final driven = samples[i] * fuzzDrive;
       samples[i] = PcmUtils.tanh(driven).clamp(-1.0, 1.0);
     }
   }
@@ -160,19 +166,25 @@ class EffectEngine {
   // ══════════════════════════ Effect 10: Hard Clip ══════════════════════════════
   void _applyHardClip(List<double> samples) {
     for (int i = 0; i < samples.length; i++) {
-      samples[i] = samples[i].clamp(-hardClipThreshold, hardClipThreshold);
-      samples[i] /= hardClipThreshold;
+      samples[i] = samples[i].clamp(-clipThreshold, clipThreshold);
+      samples[i] /= clipThreshold;
     }
   }
 
   // ══════════════════════════ Effect 2: Multi-tap Echo ═════════════════════════
+  /// Configurable multi-tap echo. Primary delay at [echoDelay] ms,
+  /// second tap at [echoDelay * 2.5] ms (clamped to buffer capacity).
+  /// [echoDecay] scales the wet mix volume (1.0 = full, 0.0 = none).
   void _applyEcho(List<double> samples) {
+    final tap1Delay = echoDelay.round();
+    final tap2Delay = (echoDelay * 2.5).round().clamp(0, AudioConstants.echoMaxDelayMs);
+    final wet = echoDecay;
     for (int i = 0; i < samples.length; i++) {
-      final echo100 = _echo.readAt(i, delayMs: 100);
-      final echo250 = _echo.readAt(i, delayMs: 250);
+      final echoTap1 = _echo.readAt(i, delayMs: tap1Delay);
+      final echoTap2 = _echo.readAt(i, delayMs: tap2Delay);
       final mixed = (samples[i] * EffectDefaults.echoMixDry) +
-          (echo100 * EffectDefaults.echoMix100) +
-          (echo250 * EffectDefaults.echoMix250);
+          (echoTap1 * EffectDefaults.echoMix100 * wet) +
+          (echoTap2 * EffectDefaults.echoMix250 * wet);
       _echo.write(i, samples[i]);
       samples[i] = mixed.clamp(-1.0, 1.0);
     }
@@ -184,27 +196,23 @@ class EffectEngine {
     final wet = _reverb.process(List<double>.from(samples));
     for (int i = 0; i < samples.length; i++) {
       samples[i] =
-          ((1.0 - reverbMix) * samples[i] + reverbMix * wet[i]).clamp(-1.0, 1.0);
+          ((1.0 - reverbRoomSize) * samples[i] + reverbRoomSize * wet[i]).clamp(-1.0, 1.0);
     }
   }
 
   // ══════════════════════════ Effect 3: Crackle Noise ═══════════════════════════
   void _applyCrackleNoise(List<double> samples) {
     for (int i = 0; i < samples.length; i++) {
-      if (_rng.nextDouble() < crackleProb) {
+      if (_rng.nextDouble() < crackleIntensity) {
         final impulse = _rng.nextBool() ? 1.0 : -1.0;
         samples[i] = (samples[i] + impulse * 0.85).clamp(-1.0, 1.0);
       }
     }
   }
 
-  // Dropout state
-  bool _dropoutActive = false;
-
   // ══════════════════════════ Effect 4: Dropout Silence ═════════════════════════
   void _applyDropout(List<double> samples) {
-    _dropoutActive = _rng.nextDouble() < dropoutProb;
-    if (_dropoutActive) {
+    if (_rng.nextDouble() < dropoutRate) {
       for (int i = 0; i < samples.length; i++) {
         samples[i] = 0.0;
       }

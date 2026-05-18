@@ -1,11 +1,13 @@
 import 'dart:math';
 
 /// Pitch wobble via linear resampling.
-/// Randomly shifts pitch by a new semitone offset in [-3, +3] every 200–600ms.
+/// Randomly shifts pitch by [range] semitones every 200–600ms.
 /// Achieved by changing the playback speed factor: speed = 2^(semitones/12).
 class PitchWobble {
   final int sampleRate;
   final Random _rng = Random();
+
+  double range = 3.0; // ± semitones (configurable)
 
   double _currentSpeed = 1.0;
   double _targetSpeed = 1.0;
@@ -24,8 +26,8 @@ class PitchWobble {
     final intervalMs = 200 + _rng.nextInt(400);
     _samplesUntilChange = (sampleRate * intervalMs / 1000).round();
 
-    // Random semitone shift ±3
-    final semitones = (_rng.nextDouble() * 6.0) - 3.0;
+    // Random semitone shift ±range
+    final semitones = (_rng.nextDouble() * (2 * range)) - range;
     _targetSpeed = pow(2.0, semitones / 12.0).toDouble();
   }
 

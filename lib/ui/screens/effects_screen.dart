@@ -46,17 +46,19 @@ class _EffectsScreenState extends State<EffectsScreen> {
       body: ListView(
         padding: const EdgeInsets.symmetric(vertical: 8),
         children: [
+          // ── Volume Gain ──
           EffectSliderCard(
             label: 'Volume Gain',
             icon: Icons.volume_up,
-            value: _settings.gainFactor,
+            value: _settings.gainBoost,
             min: 1.0,
             max: 8.0,
-            displayValue: '${_settings.gainFactor.toStringAsFixed(1)}x',
-            enabled: _settings.gainEnabled,
-            onChanged: (v) => _updateSettings(_settings.copyWith(gainFactor: v)),
-            onToggle: (v) => _updateSettings(_settings.copyWith(gainEnabled: v)),
+            displayValue: '${_settings.gainBoost.toStringAsFixed(1)}x',
+            enabled: _settings.masterEnabled && _settings.gainBoost > 0,
+            onChanged: (v) => _updateSettings(_settings.copyWith(gainBoost: v)),
+            onToggle: (v) => _updateSettings(_settings.copyWith(masterEnabled: v)),
           ),
+          // ── Radio Filter ──
           EffectSliderCard(
             label: 'Radio Filter',
             icon: Icons.radio,
@@ -65,114 +67,121 @@ class _EffectsScreenState extends State<EffectsScreen> {
             max: 1,
             divisions: 1,
             displayValue: '300–3400 Hz',
-            enabled: _settings.bandpassEnabled,
+            enabled: _settings.radioFilterEnabled,
             onChanged: (_) {},
-            onToggle: (v) => _updateSettings(_settings.copyWith(bandpassEnabled: v)),
+            onToggle: (v) => _updateSettings(_settings.copyWith(radioFilterEnabled: v)),
           ),
+          // ── Bit Crusher ──
           EffectSliderCard(
             label: 'Bit Crusher',
             icon: Icons.grid_on,
-            value: _settings.bitDepth.toDouble(),
+            value: _settings.bitCrushDepth.toDouble(),
             min: 2,
             max: 16,
             divisions: 14,
-            displayValue: '${_settings.bitDepth}-bit',
+            displayValue: '${_settings.bitCrushDepth}-bit',
             enabled: _settings.bitCrushEnabled,
-            onChanged: (v) => _updateSettings(_settings.copyWith(bitDepth: v.round())),
+            onChanged: (v) => _updateSettings(_settings.copyWith(bitCrushDepth: v.round())),
             onToggle: (v) => _updateSettings(_settings.copyWith(bitCrushEnabled: v)),
           ),
+          // ── Fuzz Distortion ──
           EffectSliderCard(
-            label: 'Soft Clip Distortion',
+            label: 'Fuzz Distortion',
             icon: Icons.waves,
-            value: _settings.softDrive,
+            value: _settings.fuzzDrive,
             min: 1.0,
             max: 10.0,
-            displayValue: '${_settings.softDrive.toStringAsFixed(1)}x',
-            enabled: _settings.softClipEnabled,
-            onChanged: (v) => _updateSettings(_settings.copyWith(softDrive: v)),
-            onToggle: (v) => _updateSettings(_settings.copyWith(softClipEnabled: v)),
+            displayValue: '${_settings.fuzzDrive.toStringAsFixed(1)}x',
+            enabled: _settings.fuzzEnabled,
+            onChanged: (v) => _updateSettings(_settings.copyWith(fuzzDrive: v)),
+            onToggle: (v) => _updateSettings(_settings.copyWith(fuzzEnabled: v)),
           ),
+          // ── Hard Clip Threshold ──
           EffectSliderCard(
-            label: 'Hard Clip Threshold',
+            label: 'Clip Threshold',
             icon: Icons.flash_on,
-            value: _settings.hardClipThreshold,
+            value: _settings.clipThreshold,
             min: 0.1,
             max: 1.0,
             divisions: 90,
-            displayValue: '${(_settings.hardClipThreshold * 100).round()}%',
-            enabled: _settings.hardClipEnabled,
-            onChanged: (v) => _updateSettings(_settings.copyWith(hardClipThreshold: v)),
-            onToggle: (v) => _updateSettings(_settings.copyWith(hardClipEnabled: v)),
+            displayValue: '${(_settings.clipThreshold * 100).round()}%',
+            enabled: _settings.clipEnabled,
+            onChanged: (v) => _updateSettings(_settings.copyWith(clipThreshold: v)),
+            onToggle: (v) => _updateSettings(_settings.copyWith(clipEnabled: v)),
           ),
+          // ── Reverb Room Size ──
           EffectSliderCard(
-            label: 'Reverb Mix',
+            label: 'Reverb Room',
             icon: Icons.meeting_room,
-            value: _settings.reverbMix,
+            value: _settings.reverbRoomSize,
             min: 0.0,
             max: 1.0,
             divisions: 100,
-            displayValue: '${(_settings.reverbMix * 100).round()}%',
+            displayValue: '${(_settings.reverbRoomSize * 100).round()}%',
             enabled: _settings.reverbEnabled,
-            onChanged: (v) => _updateSettings(_settings.copyWith(reverbMix: v)),
+            onChanged: (v) => _updateSettings(_settings.copyWith(reverbRoomSize: v)),
             onToggle: (v) => _updateSettings(_settings.copyWith(reverbEnabled: v)),
           ),
+          // ── Crackle Intensity ──
           EffectSliderCard(
-            label: 'Crackle Probability',
+            label: 'Crackle Intensity',
             icon: Icons.bolt,
-            value: _settings.crackleProb,
+            value: _settings.crackleIntensity,
             min: 0.0,
             max: 0.15,
             divisions: 150,
-            displayValue: '${(_settings.crackleProb * 100).round()}%',
+            displayValue: '${(_settings.crackleIntensity * 100).round()}%',
             enabled: _settings.crackleEnabled,
-            onChanged: (v) => _updateSettings(_settings.copyWith(crackleProb: v)),
+            onChanged: (v) => _updateSettings(_settings.copyWith(crackleIntensity: v)),
             onToggle: (v) => _updateSettings(_settings.copyWith(crackleEnabled: v)),
           ),
+          // ── Dropout Rate ──
           EffectSliderCard(
-            label: 'Dropout Probability',
+            label: 'Dropout Rate',
             icon: Icons.signal_wifi_off,
-            value: _settings.dropoutProb,
+            value: _settings.dropoutRate,
             min: 0.0,
             max: 0.20,
             divisions: 200,
-            displayValue: '${(_settings.dropoutProb * 100).round()}%',
+            displayValue: '${(_settings.dropoutRate * 100).round()}%',
             enabled: _settings.dropoutEnabled,
-            onChanged: (v) => _updateSettings(_settings.copyWith(dropoutProb: v)),
+            onChanged: (v) => _updateSettings(_settings.copyWith(dropoutRate: v)),
             onToggle: (v) => _updateSettings(_settings.copyWith(dropoutEnabled: v)),
           ),
+          // ── Pitch Wobble Range ──
           EffectSliderCard(
             label: 'Pitch Wobble',
             icon: Icons.tune,
-            value: 1,
-            min: 0,
-            max: 1,
-            divisions: 1,
-            displayValue: '±3 semitones',
+            value: _settings.pitchWobbleRange,
+            min: 0.0,
+            max: 12.0,
+            divisions: 120,
+            displayValue: '±${_settings.pitchWobbleRange.toStringAsFixed(1)} st',
             enabled: _settings.pitchWobbleEnabled,
-            onChanged: (_) {},
+            onChanged: (v) => _updateSettings(_settings.copyWith(pitchWobbleRange: v)),
             onToggle: (v) => _updateSettings(_settings.copyWith(pitchWobbleEnabled: v)),
           ),
+          // ── Echo Delay ──
           EffectSliderCard(
             label: 'Echo Delay',
             icon: Icons.repeat,
-            value: _settings.echoMixDry,
-            min: 0.0,
-            max: 1.0,
-            divisions: 100,
-            displayValue: '${(_settings.echoMixDry * 100).round()}% dry',
+            value: _settings.echoDelay,
+            min: 20.0,
+            max: 500.0,
+            divisions: 96,
+            displayValue: '${_settings.echoDelay.round()}ms',
             enabled: _settings.echoEnabled,
-            onChanged: (v) => _updateSettings(_settings.copyWith(echoMixDry: v)),
+            onChanged: (v) => _updateSettings(_settings.copyWith(echoDelay: v)),
             onToggle: (v) => _updateSettings(_settings.copyWith(echoEnabled: v)),
           ),
-          const SizedBox(height: 8),
-          // Echo 100ms tap mix
+          // ── Echo Decay ──
           Padding(
             padding: const EdgeInsets.only(left: 68),
             child: Row(
               children: [
                 const SizedBox(width: 12),
                 Text(
-                  '100ms tap',
+                  'Decay',
                   style: TextStyle(
                     fontSize: 11,
                     color: Colors.grey.withOpacity(0.7),
@@ -180,61 +189,21 @@ class _EffectsScreenState extends State<EffectsScreen> {
                 ),
                 Expanded(
                   child: Slider(
-                    value: _settings.echoMix100,
+                    value: _settings.echoDecay,
                     min: 0.0,
-                    max: 0.8,
-                    divisions: 80,
+                    max: 0.9,
+                    divisions: 90,
                     activeColor: Colors.orange.withOpacity(0.6),
                     inactiveColor: Colors.grey.withOpacity(0.2),
                     onChanged: _settings.echoEnabled
-                        ? (v) => _updateSettings(_settings.copyWith(echoMix100: v))
+                        ? (v) => _updateSettings(_settings.copyWith(echoDecay: v))
                         : null,
                   ),
                 ),
                 SizedBox(
                   width: 40,
                   child: Text(
-                    '${(_settings.echoMix100 * 100).round()}%',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontFamily: 'monospace',
-                      color: Colors.orange.withOpacity(0.7),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          // Echo 250ms tap mix
-          Padding(
-            padding: const EdgeInsets.only(left: 80),
-            child: Row(
-              children: [
-                const SizedBox(width: 24),
-                Text(
-                  '250ms tap',
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: Colors.grey.withOpacity(0.7),
-                  ),
-                ),
-                Expanded(
-                  child: Slider(
-                    value: _settings.echoMix250,
-                    min: 0.0,
-                    max: 0.8,
-                    divisions: 80,
-                    activeColor: Colors.orange.withOpacity(0.6),
-                    inactiveColor: Colors.grey.withOpacity(0.2),
-                    onChanged: _settings.echoEnabled
-                        ? (v) => _updateSettings(_settings.copyWith(echoMix250: v))
-                        : null,
-                  ),
-                ),
-                SizedBox(
-                  width: 40,
-                  child: Text(
-                    '${(_settings.echoMix250 * 100).round()}%',
+                    '${(_settings.echoDecay * 100).round()}%',
                     style: TextStyle(
                       fontSize: 11,
                       fontFamily: 'monospace',
@@ -246,6 +215,7 @@ class _EffectsScreenState extends State<EffectsScreen> {
             ),
           ),
           const SizedBox(height: 16),
+          // ── Reset ──
           Center(
             child: TextButton.icon(
               onPressed: () {

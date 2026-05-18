@@ -37,18 +37,18 @@ class NativeAudioBridge {
   /// Update DSP parameters in the native layer.
   Future<void> updateParams({
     required double gain,
-    required double crackleProb,
-    required double dropoutProb,
-    required int bitDepth,
-    required double hardClipThreshold,
+    required double crackleIntensity,
+    required double dropoutRate,
+    required int bitCrushDepth,
+    required double clipThreshold,
   }) async {
     try {
       await _channel.invokeMethod(ChannelMethods.updateParams, {
         'gain': gain,
-        'crackleProb': crackleProb,
-        'dropoutProb': dropoutProb,
-        'bitDepth': bitDepth,
-        'hardClipThreshold': hardClipThreshold,
+        'crackleIntensity': crackleIntensity,
+        'dropoutRate': dropoutRate,
+        'bitCrushDepth': bitCrushDepth,
+        'clipThreshold': clipThreshold,
       });
     } on PlatformException catch (e) {
       AppLogger.error('updateParams failed: ${e.message}');

@@ -1,4 +1,4 @@
-/// Centralized app state for ChaosVoice.
+/// App state for ChaosVoice.
 enum ChaosServiceStatus {
   /// Service is stopped / inactive.
   stopped,
@@ -18,6 +18,9 @@ class ChaosState {
   final ChaosServiceStatus serviceStatus;
   final bool hasMicPermission;
   final bool hasNotificationPermission;
+  final bool isAndroid;
+  final bool isIOS;
+  final double currentRmsLevel;
   final String? errorMessage;
   final String platformName;
   final int sampleRate;
@@ -27,6 +30,9 @@ class ChaosState {
     this.serviceStatus = ChaosServiceStatus.stopped,
     this.hasMicPermission = false,
     this.hasNotificationPermission = false,
+    this.isAndroid = false,
+    this.isIOS = false,
+    this.currentRmsLevel = 0.0,
     this.errorMessage,
     this.platformName = '',
     this.sampleRate = 16000,
@@ -37,6 +43,9 @@ class ChaosState {
     ChaosServiceStatus? serviceStatus,
     bool? hasMicPermission,
     bool? hasNotificationPermission,
+    bool? isAndroid,
+    bool? isIOS,
+    double? currentRmsLevel,
     String? errorMessage,
     String? platformName,
     int? sampleRate,
@@ -48,6 +57,9 @@ class ChaosState {
       hasMicPermission: hasMicPermission ?? this.hasMicPermission,
       hasNotificationPermission:
           hasNotificationPermission ?? this.hasNotificationPermission,
+      isAndroid: isAndroid ?? this.isAndroid,
+      isIOS: isIOS ?? this.isIOS,
+      currentRmsLevel: currentRmsLevel ?? this.currentRmsLevel,
       errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
       platformName: platformName ?? this.platformName,
       sampleRate: sampleRate ?? this.sampleRate,
@@ -65,6 +77,9 @@ class ChaosState {
           serviceStatus == other.serviceStatus &&
           hasMicPermission == other.hasMicPermission &&
           hasNotificationPermission == other.hasNotificationPermission &&
+          isAndroid == other.isAndroid &&
+          isIOS == other.isIOS &&
+          currentRmsLevel == other.currentRmsLevel &&
           errorMessage == other.errorMessage &&
           platformName == other.platformName &&
           sampleRate == other.sampleRate &&
@@ -75,6 +90,9 @@ class ChaosState {
         serviceStatus,
         hasMicPermission,
         hasNotificationPermission,
+        isAndroid,
+        isIOS,
+        currentRmsLevel,
         errorMessage,
         platformName,
         sampleRate,

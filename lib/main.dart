@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'services/native_audio_bridge.dart';
 import 'services/foreground_task_handler.dart';
+import 'services/audio_service_handler.dart';
 import 'ui/screens/home_screen.dart';
 import 'ui/screens/effects_screen.dart';
 import 'ui/screens/settings_screen.dart';
@@ -27,6 +28,9 @@ void main() async {
 
   // Initialize foreground task configuration
   initForegroundTask();
+
+  // Initialize audio service handler for background audio
+  await ChaosVoiceAudioHandler().init();
 
   AppLogger.info('ChaosVoice starting...');
 
@@ -117,11 +121,11 @@ class _EffectsScreenWrapperState extends State<_EffectsScreenWrapper> {
     });
     // Push updated params to native layer
     NativeAudioBridge().updateParams(
-      gain: newSettings.gainFactor,
-      crackleProb: newSettings.crackleProb,
-      dropoutProb: newSettings.dropoutProb,
-      bitDepth: newSettings.bitDepth,
-      hardClipThreshold: newSettings.hardClipThreshold,
+      gain: newSettings.gainBoost,
+      crackleIntensity: newSettings.crackleIntensity,
+      dropoutRate: newSettings.dropoutRate,
+      bitCrushDepth: newSettings.bitCrushDepth,
+      clipThreshold: newSettings.clipThreshold,
     );
     AppLogger.info('Effects settings updated');
   }
