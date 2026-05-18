@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Dark theme for ChaosVoice -->
+    <style name="Theme.ChaosVoice" parent="@android:style/Theme.Material.NoActionBar">
+        <item name="android:windowBackground">#FF0D0D0D</item>
+        <item name="android:statusBarColor">#FF000000</item>
+        <item name="android:navigationBarColor">#FF0D0D0D</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+</resources>

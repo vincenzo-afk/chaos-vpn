@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">ChaosVoice</string>
+    <string name="notification_channel_name">ChaosVoice Service</string>
+    <string name="notification_channel_description">ChaosVoice is running and transforming your microphone</string>
+    <string name="notification_active_title">☠️ ChaosVoice is ACTIVE</string>
+    <string name="notification_active_body">Your voice is being chaotically transformed</string>
+    <string name="action_stop">Stop</string>
+</resources>

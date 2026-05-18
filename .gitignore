@@ -1,0 +1,51 @@
+# Flutter/Dart
+.dart_tool/
+.packages
+.pub/
+build/
+*.js_
+*.js.deps
+*.js.map
+*.g.dart
+*.freezed.dart
+*.mocks.dart
+
+# IDE
+.idea/
+.vscode/
+*.iml
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Android
+android/.gradle/
+android/local.properties
+android/key.properties
+android/build/
+*.keystore
+*.jks
+
+# iOS
+ios/Pods/
+ios/.symlinks/
+ios/Flutter/Flutter.framework
+ios/Flutter/Flutter.podspec
+ios/Runner.xcworkspace/
+ios/Runner.xcodeproj/xcuserdata/
+ios/Runner.xcodeproj/project.xcworkspace/xcshareddata/
+ios/Runner.xcodeproj/project.xcworkspace/xcuserdata/
+
+# Flutter generated
+*.flutter-plugins
+*.flutter-plugins-dependencies
+
+# Assets (generated)
+assets/audio/impulse_response.wav
+assets/images/chaos_logo.png
+
+# Misc
+*.log
+*.tmp
+*.bak
