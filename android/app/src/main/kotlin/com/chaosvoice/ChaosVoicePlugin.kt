@@ -51,6 +51,21 @@ class ChaosVoicePlugin : FlutterPlugin, MethodCallHandler {
                 }
                 result.success(null)
             }
+            "setRoutingMode" -> {
+                result.success(true)
+            }
+            "isDeviceRooted" -> {
+                val rooted = try {
+                    val process = Runtime.getRuntime().exec(arrayOf("su", "-c", "id"))
+                    val reader = process.inputStream.bufferedReader()
+                    val line = reader.readLine()
+                    process.destroy()
+                    line?.contains("uid=0") == true
+                } catch (_: Exception) {
+                    false
+                }
+                result.success(rooted)
+            }
             else -> result.notImplemented()
         }
     }

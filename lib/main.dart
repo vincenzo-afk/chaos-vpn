@@ -1,13 +1,14 @@
-import 'models/effect_settings.dart';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'services/native_audio_bridge.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'providers/chaos_state_provider.dart';
 import 'services/foreground_task_handler.dart';
 import 'services/audio_service_handler.dart';
 import 'ui/screens/home_screen.dart';
 import 'ui/screens/effects_screen.dart';
 import 'ui/screens/settings_screen.dart';
-import 'utils/constants.dart';
+import 'ui/screens/onboarding_screen.dart';
 import 'utils/logger.dart';
 
 void main() async {
@@ -34,126 +35,165 @@ void main() async {
 
   AppLogger.info('ChaosVoice starting...');
 
-  runApp(const ChaosVoiceApp());
+  runApp(const ProviderScope(child: ChaosVoiceApp()));
 }
 
-class ChaosVoiceApp extends StatelessWidget {
+class ChaosVoiceApp extends ConsumerWidget {
   const ChaosVoiceApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return MaterialApp(
       title: 'ChaosVoice',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        brightness: Brightness.dark,
-        scaffoldBackgroundColor: const Color(0xFF0D0D0D),
-        colorScheme: const ColorScheme.dark(
-          primary: Colors.orange,
-          secondary: Colors.red,
-          surface: Color(0xFF1A1A1A),
-          error: Colors.red,
-        ),
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Colors.black,
-          foregroundColor: Colors.white,
-          elevation: 0,
-          centerTitle: true,
-        ),
-        cardTheme: CardThemeData(
-          color: const Color(0xFF1A1A1A),
-          elevation: 2,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
-        elevatedButtonTheme: ElevatedButtonThemeData(
-          style: ElevatedButton.styleFrom(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-        ),
-        textTheme: const TextTheme(
-          bodyLarge: TextStyle(color: Colors.white),
-          bodyMedium: TextStyle(color: Colors.white),
-          bodySmall: TextStyle(color: Colors.grey),
-        ),
-      ),
+      theme: _buildChaosTheme(),
       home: const AppShell(),
       routes: {
-        '/effects': (context) => const _EffectsScreenWrapper(),
-        '/settings': (context) => const _SettingsScreenWrapper(),
+        '/effects': (context) => const EffectsScreen(),
+        '/settings': (context) => const SettingsScreen(),
+        '/onboarding': (context) => const OnboardingScreen(),
       },
+    );
+  }
+
+  /// Build the dark CRT/glitch-inspired theme for ChaosVoice.
+  ThemeData _buildChaosTheme() {
+    return ThemeData(
+      brightness: Brightness.dark,
+      scaffoldBackgroundColor: const Color(0xFF0A0A0A),
+      colorScheme: const ColorScheme.dark(
+        primary: Color(0xFFFF4500), // CRT orange-red
+        secondary: Color(0xFF00FF41), // CRT green
+        surface: Color(0xFF111111),
+        error: Color(0xFFFF0033),
+        onPrimary: Colors.white,
+        onSecondary: Colors.black,
+        onSurface: Colors.white,
+        onError: Colors.white,
+      ),
+      appBarTheme: const AppBarTheme(
+        backgroundColor: Color(0xFF050505),
+        foregroundColor: Color(0xFFCCCCCC),
+        elevation: 0,
+        centerTitle: true,
+        titleTextStyle: TextStyle(
+          color: Color(0xFFFF4500),
+          fontSize: 20,
+          fontWeight: FontWeight.bold,
+          letterSpacing: 3,
+        ),
+      ),
+      cardTheme: CardTheme(
+        color: const Color(0xFF111111),
+        elevation: 2,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+          side: const BorderSide(
+            color: Color(0xFF2A2A2A),
+            width: 1,
+          ),
+        ),
+      ),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(4),
+          ),
+          backgroundColor: const Color(0xFFFF4500),
+          foregroundColor: Colors.black,
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+        ),
+      ),
+      dividerTheme: const DividerThemeData(
+        color: Color(0xFF1A1A1A),
+        thickness: 1,
+      ),
+      sliderTheme: const SliderThemeData(
+        activeTrackColor: Color(0xFFFF4500),
+        inactiveTrackColor: Color(0xFF2A2A2A),
+        thumbColor: Color(0xFFFF4500),
+        overlayColor: Color(0x29FF4500),
+        thumbShape: RoundSliderThumbShape(enabledThumbRadius: 8),
+        trackHeight: 4,
+      ),
+      switchTheme: SwitchThemeData(
+        thumbColor: MaterialStateProperty.resolveWith((states) {
+          if (states.contains(MaterialState.selected)) return const Color(0xFFFF4500);
+          return Colors.grey;
+        }),
+        trackColor: MaterialStateProperty.resolveWith((states) {
+          if (states.contains(MaterialState.selected)) return const Color(0x4DFF4500);
+          return const Color(0xFF2A2A2A);
+        }),
+      ),
+      textTheme: const TextTheme(
+        bodyLarge: TextStyle(
+          color: Color(0xFFCCCCCC),
+          fontFamily: 'monospace',
+          fontSize: 14,
+        ),
+        bodyMedium: TextStyle(
+          color: Color(0xFFCCCCCC),
+          fontFamily: 'monospace',
+          fontSize: 13,
+        ),
+        bodySmall: TextStyle(
+          color: Color(0xFF666666),
+          fontFamily: 'monospace',
+          fontSize: 11,
+        ),
+      ),
     );
   }
 }
 
-/// Root shell widget that manages app state.
-class AppShell extends StatefulWidget {
+/// Root shell widget with ProviderScope wrapper.
+class AppShell extends ConsumerStatefulWidget {
   const AppShell({super.key});
 
   @override
-  State<AppShell> createState() => _AppShellState();
+  ConsumerState<AppShell> createState() => _AppShellState();
 }
 
-class _AppShellState extends State<AppShell> {
+class _AppShellState extends ConsumerState<AppShell> {
+  bool _onboardingChecked = false;
+
+  static const String _flagFileName = 'chaosvoice_onboarding_done.flag';
+
+  /// Check if onboarding has been shown; if not, navigate to onboarding screen.
+  Future<void> _checkOnboarding() async {
+    if (_onboardingChecked) return;
+    _onboardingChecked = true;
+
+    final flagFile = File('${Directory.systemTemp.path}/$_flagFileName');
+    final onboardingDone = flagFile.existsSync();
+
+    if (!onboardingDone && mounted) {
+      // Show onboarding as a modal route — user dismisses it to proceed
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => const OnboardingScreen(),
+          fullscreenDialog: true,
+        ),
+      );
+      // Mark onboarding as complete
+      flagFile.createSync();
+      AppLogger.info('[Onboarding] Marked as complete');
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    // Initialize state after first frame, then show onboarding
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(chaosStateProvider.notifier).init();
+      _checkOnboarding();
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return const HomeScreen();
-  }
-}
-
-/// Wrapper for effects screen that reads state from parent.
-class _EffectsScreenWrapper extends StatefulWidget {
-  const _EffectsScreenWrapper();
-
-  @override
-  State<_EffectsScreenWrapper> createState() => _EffectsScreenWrapperState();
-}
-
-class _EffectsScreenWrapperState extends State<_EffectsScreenWrapper> {
-  EffectSettings _settings = const EffectSettings();
-
-  void _onEffectsChanged(EffectSettings newSettings) {
-    setState(() {
-      _settings = newSettings;
-    });
-    // Push updated params to native layer
-    NativeAudioBridge().updateParams(
-      gain: newSettings.gainBoost,
-      crackleIntensity: newSettings.crackleIntensity,
-      dropoutRate: newSettings.dropoutRate,
-      bitCrushDepth: newSettings.bitCrushDepth,
-      clipThreshold: newSettings.clipThreshold,
-    );
-    AppLogger.info('Effects settings updated');
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return EffectsScreen(
-      initialSettings: _settings,
-      onSettingsChanged: _onEffectsChanged,
-    );
-  }
-}
-
-/// Wrapper for settings screen.
-class _SettingsScreenWrapper extends StatelessWidget {
-  const _SettingsScreenWrapper();
-
-  @override
-  Widget build(BuildContext context) {
-    return SettingsScreen(
-      sampleRate: AudioConstants.sampleRate,
-      bufferSize: AudioConstants.bufferSize,
-      onSampleRateChanged: (rate) {
-        AppLogger.info('Sample rate changed to $rate');
-      },
-      onBufferSizeChanged: (size) {
-        AppLogger.info('Buffer size changed to $size');
-      },
-    );
   }
 }

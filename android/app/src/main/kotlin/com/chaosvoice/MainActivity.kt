@@ -51,6 +51,29 @@ class MainActivity : FlutterActivity() {
                     }
                     result.success(null)
                 }
+                "setRoutingMode" -> {
+                    // Pass the mode string to VirtualMicService
+                    val mode = (call.argument<String>("mode")) ?: "no-root"
+                    val audioManager = getSystemService(AUDIO_SERVICE) as AudioManager
+                    when (mode.lowercase()) {
+                        "root" -> audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
+                        "no-root", "auto-detect" -> audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
+                        else -> audioManager.mode = AudioManager.MODE_NORMAL
+                    }
+                    result.success(true)
+                }
+                "isDeviceRooted" -> {
+                    val rooted = try {
+                        val process = Runtime.getRuntime().exec(arrayOf("su", "-c", "id"))
+                        val reader = process.inputStream.bufferedReader()
+                        val line = reader.readLine()
+                        process.destroy()
+                        line?.contains("uid=0") == true
+                    } catch (_: Exception) {
+                        false
+                    }
+                    result.success(rooted)
+                }
                 else -> result.notImplemented()
             }
         }

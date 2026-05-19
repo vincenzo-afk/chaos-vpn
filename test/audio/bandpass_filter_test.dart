@@ -15,7 +15,7 @@ void main() {
     });
 
     test('process does not crash on valid input', () {
-      final samples = List<double>.generate(320, (i) => 0.5 * (i * 0.1).sin());
+      final samples = List<double>.generate(320, (i) => 0.5 * sin(i * 0.1));
       filter.process(samples);
       expect(samples.length, equals(320));
     });
@@ -42,7 +42,7 @@ void main() {
         highHz: 2000.0,
       );
       // Process the same input through both filters
-      final input = List<double>.generate(320, (i) => 0.5 * (i * 0.1).sin());
+      final input = List<double>.generate(320, (i) => 0.5 * sin(i * 0.1));
       final inputClone = List<double>.from(input);
       filter.process(input);
       filter2.process(inputClone);
@@ -89,14 +89,14 @@ void main() {
 
     test('reset clears internal state', () {
       // Run some signal through
-      final samples1 = List<double>.generate(320, (i) => 0.5 * (i * 0.1).sin());
+      final samples1 = List<double>.generate(320, (i) => 0.5 * sin(i * 0.1));
       filter.process(samples1);
 
       // Reset
       filter.reset();
 
       // Verify it doesn't crash with new signal
-      final samples2 = List<double>.generate(320, (i) => 0.3 * (i * 0.05).cos());
+      final samples2 = List<double>.generate(320, (i) => 0.3 * cos(i * 0.05));
       filter.process(samples2);
       expect(samples2.length, equals(320));
     });

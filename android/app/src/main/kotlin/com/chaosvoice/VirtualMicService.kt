@@ -44,6 +44,11 @@ class VirtualMicService : Service() {
         @Volatile var dropoutRate: Float = 0.06f
         @Volatile var clipThreshold: Float = 0.60f
         @Volatile var bitCrushDepth: Int = 6
+        @Volatile var reverbRoomSize: Float = 0.45f
+        @Volatile var fuzzDrive: Float = 4.0f
+        @Volatile var echoDelay: Float = 100.0f
+        @Volatile var echoDecay: Float = 1.0f
+        @Volatile var pitchWobbleRange: Float = 3.0f
 
         @Volatile var isRunning: Boolean = false
             private set
@@ -77,9 +82,13 @@ class VirtualMicService : Service() {
             crackleIntensity = (args["crackleIntensity"] as? Double)?.toFloat() ?: crackleIntensity
             dropoutRate = (args["dropoutRate"] as? Double)?.toFloat() ?: dropoutRate
             bitCrushDepth = (args["bitCrushDepth"] as? Int) ?: bitCrushDepth
-            clipThreshold = (args["clipThreshold"] as? Double)?.toFloat()
-                ?: clipThreshold
-            Log.d(TAG, "DSP params updated: gain=$gainFactor, bitCrushDepth=$bitCrushDepth")
+            clipThreshold = (args["clipThreshold"] as? Double)?.toFloat() ?: clipThreshold
+            reverbRoomSize = (args["reverbRoomSize"] as? Double)?.toFloat() ?: reverbRoomSize
+            fuzzDrive = (args["fuzzDrive"] as? Double)?.toFloat() ?: fuzzDrive
+            echoDelay = (args["echoDelay"] as? Double)?.toFloat() ?: echoDelay
+            echoDecay = (args["echoDecay"] as? Double)?.toFloat() ?: echoDecay
+            pitchWobbleRange = (args["pitchWobbleRange"] as? Double)?.toFloat() ?: pitchWobbleRange
+            Log.d(TAG, "DSP params updated: gain=$gainFactor, bitCrushDepth=$bitCrushDepth, fuzz=$fuzzDrive")
         }
     }
 

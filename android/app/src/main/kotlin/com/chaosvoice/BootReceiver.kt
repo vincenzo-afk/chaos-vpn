@@ -17,7 +17,11 @@ class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action == Intent.ACTION_BOOT_COMPLETED) {
             Log.d(TAG, "Boot completed — restarting ChaosVoice service")
-            VirtualMicService.start(context)
+            // Start the VirtualMicService via the standard Intent action
+            val serviceIntent = Intent(context, VirtualMicService::class.java).apply {
+                action = "START"
+            }
+            context.startForegroundService(serviceIntent)
         }
     }
 }

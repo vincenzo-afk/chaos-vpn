@@ -32,6 +32,9 @@ class AudioEngineManager {
     var crackleProb: Float = 0.03
     var dropoutProb: Float = 0.06
     var delayTime: Double = 0.1
+    var delayFeedback: Float = 40.0
+    var distortionGain: Float = 20.0
+    var pitchRange: Float = 300.0 // cents (±3 semitones default)
 
     // Chaos state
     private(set) var isActive = false
@@ -227,8 +230,9 @@ class AudioEngineManager {
             repeats: false
         ) { [weak self] _ in
             guard let self = self, self.isActive else { return }
-            // ±3 semitones = ±300 cents
-            let newPitch = Float.random(in: -300...300)
+            // Use pitchRange (in cents) from Flutter settings; range is ±pitchRange
+            let halfRange = self.pitchRange
+            let newPitch = Float.random(in: -halfRange...halfRange)
             self.timePitchNode?.pitch = newPitch
             self.startPitchWobble()
         }
@@ -261,12 +265,36 @@ class AudioEngineManager {
     }
 
     func updateReverb(_ wetDry: Float) {
+        reverbWetDry = wetDry
         reverbNode?.wetDryMix = wetDry
     }
 
     func updateDelay(_ time: Double, feedback: Float) {
+        delayTime = time
         delayNode?.delayTime = time
         delayNode?.feedback = feedback
+    }
+
+    func updatePitchRange(_ cents: Float) {
+        pitchRange = cents
+        // Update current pitch if engine is running
+        if isActive {
+            let newPitch = Float.random(in: -cents...cents)
+            timePitchNode?.pitch = newPitch
+        }
+    }
+
+    func updateDistortion(_ gain: Float) {
+        distortionGain = gain
+        distortionNode?.preGain = gain
+    }
+
+    func updateCrackle(_ prob: Float) {
+        crackleProb = prob
+    }
+
+    func updateDropout(_ prob: Float) {
+        dropoutProb = prob
     }
 }
 

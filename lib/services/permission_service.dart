@@ -1,8 +1,10 @@
 import 'dart:io';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import '../utils/logger.dart';
 
-/// Handles microphone and notification permission requests.
+/// Handles microphone and notification permission requests,
+/// including battery optimization exemption.
 class PermissionService {
   static final PermissionService _instance = PermissionService._();
   factory PermissionService() => _instance;
@@ -51,6 +53,33 @@ class PermissionService {
     final mic = await requestMicPermission();
     final notif = await requestNotificationPermission();
     return mic && notif;
+  }
+
+  /// Request battery optimization exemption using FlutterForegroundTask.
+  /// Affected OEMs: Samsung (One UI), Xiaomi/MIUI, OPPO/ColorOS,
+  /// Huawei (EMUI), OnePlus (OxygenOS).
+  Future<void> requestBatteryOptimizationExemption() async {
+    if (!Platform.isAndroid) return;
+    try {
+      final isIgnoring =
+          await FlutterForegroundTask.isIgnoringBatteryOptimizations;
+      if (!isIgnoring) {
+        await FlutterForegroundTask.requestIgnoreBatteryOptimization();
+        AppLogger.info('[Permissions] Battery optimization exemption requested');
+      }
+    } catch (e) {
+      AppLogger.error('Failed to request battery optimization exemption: $e');
+    }
+  }
+
+  /// Check if battery optimization is already disabled.
+  Future<bool> isBatteryOptimizationExempted() async {
+    if (!Platform.isAndroid) return true;
+    try {
+      return await FlutterForegroundTask.isIgnoringBatteryOptimizations;
+    } catch (_) {
+      return false;
+    }
   }
 
   /// Open the app settings page (for when user permanently denied).

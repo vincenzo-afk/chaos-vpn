@@ -1,10 +1,9 @@
-# Image Assets
+# Images
 
-## chaos_logo.png
+Place app images here, such as:
+- `chaos_logo.png` — App logo for splash screens and notifications
+- `chaos_banner.png` — Banner for social sharing / README
 
-Place the ChaosVoice app logo here.
-Suggested size: 512x512 px
-Format: PNG with transparency
-
-For development, you can use a placeholder image or skip — the app will work
-without it.
+## Format Requirements
+- PNG format recommended
+- Use Material Design icon guidelines for notification icons

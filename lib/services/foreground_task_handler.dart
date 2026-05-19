@@ -1,3 +1,4 @@
+import 'dart:isolate';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import '../utils/logger.dart';
 import 'native_audio_bridge.dart';
@@ -14,13 +15,13 @@ class ChaosVoiceTaskHandler extends TaskHandler {
   final _bridge = NativeAudioBridge();
 
   @override
-  Future<void> onStart(DateTime timestamp, TaskStarter starter) async {
+  Future<void> onStart(DateTime timestamp, SendPort? sendPort) async {
     AppLogger.info('[ForegroundTask] Task started at $timestamp');
     await _bridge.startService();
   }
 
   @override
-  void onRepeatEvent(DateTime timestamp) {
+  void onRepeatEvent(DateTime timestamp, SendPort? sendPort) {
     // Health check — restart service if it died
     _bridge.isServiceRunning().then((running) {
       if (!running) {
@@ -31,7 +32,7 @@ class ChaosVoiceTaskHandler extends TaskHandler {
   }
 
   @override
-  Future<void> onDestroy(DateTime timestamp) async {
+  Future<void> onDestroy(DateTime timestamp, SendPort? sendPort) async {
     AppLogger.info('[ForegroundTask] Task destroyed at $timestamp');
     await _bridge.stopService();
   }

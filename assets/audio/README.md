@@ -1,11 +1,17 @@
-# Audio Assets
+# Impulse Response Files
 
-## impulse_response.wav
+Place your convolution reverb impulse response WAV files here.
 
-A large-room convolution reverb impulse response file.
+## Format Requirements
+- Sample rate: 16000 Hz (or match the app's configured sample rate)
+- Bit depth: 16-bit
+- Channels: Mono
+- Format: WAV (PCM)
 
-You can generate one using a tool like:
-- `sox -n -r 16000 -b 16 -c 1 impulse_response.wav synth 2.0 reverb 80 50 100`
-- Or download a free IR from openairlib.net
+## Usage
+The `impulse_response.wav` file will be loaded by the convolution reverb
+module (Phase 3 of the roadmap) for realistic room simulation.
 
-Place the file here for convolution reverb support.
+Currently, ChaosVoice uses a Schroeder reverb network (4 comb + 2 all-pass)
+as the default reverb algorithm. Replace this placeholder with a real IR
+file to enable convolution reverb support.

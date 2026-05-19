@@ -4,7 +4,7 @@ import 'dart:math';
 /// Passes frequencies between [lowHz] and [highHz].
 /// Used to create the telephone / broken walkie-talkie effect (300–3400 Hz).
 class BandpassFilter {
-  final double sampleRate;
+  final int sampleRate;
   final double lowHz;
   final double highHz;
 

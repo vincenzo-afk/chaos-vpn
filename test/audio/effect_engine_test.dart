@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+import 'dart:math';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:chaosvoice/audio/effect_engine.dart';
 import 'package:chaosvoice/audio/pcm_utils.dart';
@@ -13,7 +14,7 @@ void main() {
       engine = EffectEngine();
       // Fill with a 440Hz sine wave at 16kHz
       for (int i = 0; i < 320; i++) {
-        testInput[i] = (32767.0 * 0.5 * (i * 440.0 * 2 * 3.14159 / 16000).sin())
+        testInput[i] = (32767.0 * 0.5 * sin(i * 440.0 * 2 * 3.14159 / 16000))
             .round();
       }
     });
@@ -214,7 +215,7 @@ void main() {
     });
 
     test('updateFromSettings applies all parameters', () {
-      final settings = EffectSettings(
+      const settings = EffectSettings(
         gainBoost: 3.0,
         crackleIntensity: 0.05,
         dropoutRate: 0.10,

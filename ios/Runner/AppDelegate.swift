@@ -28,6 +28,12 @@ import AVFoundation
                 result(AudioEngineManager.shared.isActive)
             case "updateParams":
                 self?.updateParams(call, result: result)
+            case "setRoutingMode":
+                // iOS always uses .voiceChat — no-op
+                result(true)
+            case "isDeviceRooted":
+                // iOS does not support root
+                result(false)
             default:
                 result(FlutterMethodNotImplemented)
             }
@@ -88,10 +94,27 @@ import AVFoundation
             manager.updateGain(Float(gain))
         }
         if let crackleIntensity = args["crackleIntensity"] as? Double {
-            manager.crackleProb = Float(crackleIntensity)
+            manager.updateCrackle(Float(crackleIntensity))
         }
         if let dropoutRate = args["dropoutRate"] as? Double {
-            manager.dropoutProb = Float(dropoutRate)
+            manager.updateDropout(Float(dropoutRate))
+        }
+        if let reverbRoomSize = args["reverbRoomSize"] as? Double {
+            manager.updateReverb(Float(reverbRoomSize) * 100.0)
+        }
+        if let fuzzDrive = args["fuzzDrive"] as? Double {
+            manager.updateDistortion(Float(fuzzDrive) * 5.0)
+        }
+        if let echoDelay = args["echoDelay"] as? Double {
+            let delayTime = echoDelay / 1000.0
+            var feedback: Float = 40.0
+            if let echoDecay = args["echoDecay"] as? Double {
+                feedback = Float(echoDecay) * 100.0
+            }
+            manager.updateDelay(delayTime, feedback: feedback)
+        }
+        if let pitchWobbleRange = args["pitchWobbleRange"] as? Double {
+            manager.updatePitchRange(Float(pitchWobbleRange) * 100.0)
         }
         result(nil)
     }

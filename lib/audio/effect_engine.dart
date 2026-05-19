@@ -5,13 +5,24 @@ import 'echo_buffer.dart';
 import 'reverb_processor.dart';
 import 'pitch_wobble.dart';
 import 'pcm_utils.dart';
+import 'graphic_eq.dart';
+import 'chorus_flanger.dart';
+import 'convolution_reverb.dart';
+import 'formant_shifter.dart';
 import '../models/effect_settings.dart';
 import '../utils/constants.dart';
-import '../utils/logger.dart';
 
-/// Master DSP effect engine — applies all 10 chaos effects to a raw PCM chunk.
+/// Master DSP effect engine — applies all 10 core chaos effects to raw PCM chunks.
 /// Input: Int16List of raw mic samples (16-bit, mono, 16000 Hz)
 /// Output: Int16List of processed samples ready for virtual mic injection.
+///
+/// Pipeline order (matching README2.MD Table of Effects):
+///   1. Gain Boost → 2. Radio/Telephone Bandpass → 3. Bit Crusher
+///   4. Soft Clip/Overdrive → 5. Hard Clip → 6. Echo Delay
+///   7. Room Reverb → 8. Crackle/Static → 9. Voice Dropout → 10. Pitch Wobble
+///
+/// Additional Phase 3 effects (disabled by default): GraphicEQ, Chorus/Flanger,
+/// Convolution Reverb, Formant Shifter — slotted between Hard Clip and Echo.
 class EffectEngine {
   final int sampleRate;
   final Random _rng = Random();
@@ -26,6 +37,7 @@ class EffectEngine {
   double reverbRoomSize = EffectDefaults.reverbRoomSize;
   double echoDelay = EffectDefaults.echoDelay;
   double echoDecay = EffectDefaults.echoDecay;
+  double pitchWobbleRange = EffectDefaults.pitchWobbleRange;
 
   // Effect toggle flags
   bool masterEnabled = true;
@@ -40,11 +52,21 @@ class EffectEngine {
   bool dropoutEnabled = true;
   bool pitchWobbleEnabled = true;
 
+  // Low power mode: disables most expensive effects (reverb, pitch wobble)
+  bool lowPowerMode = false;
+
+  // Echo pre-warm flag: ensures echo buffer has signal on first call
+  bool _echoPreWarmed = false;
+
   // Internal processors
   late final BandpassFilter _bandpass;
   late final EchoBuffer _echo;
   late final ReverbProcessor _reverb;
   late final PitchWobble _pitch;
+  late final GraphicEQ _graphicEq;
+  late final ChorusFlanger _chorus;
+  late final ConvolutionReverb _convolutionReverb;
+  late final FormantShifter _formantShifter;
 
   // Processing statistics
   int totalChunksProcessed = 0;
@@ -58,10 +80,14 @@ class EffectEngine {
     );
     _echo = EchoBuffer(
       sampleRate: sampleRate,
-      maxDelayMs: 500,
+      maxDelayMs: AudioConstants.echoMaxDelayMs,
     );
     _reverb = ReverbProcessor(sampleRate: sampleRate);
     _pitch = PitchWobble(sampleRate: sampleRate);
+    _graphicEq = GraphicEQ(sampleRate: sampleRate);
+    _chorus = ChorusFlanger(sampleRate: sampleRate);
+    _convolutionReverb = ConvolutionReverb(sampleRate: sampleRate);
+    _formantShifter = FormantShifter(sampleRate: sampleRate);
   }
 
   /// Update all effect parameters from a settings object.
@@ -76,7 +102,7 @@ class EffectEngine {
     reverbRoomSize = settings.reverbRoomSize;
     echoDelay = settings.echoDelay;
     echoDecay = settings.echoDecay;
-    gainEnabled = settings.gainBoost > 0 && settings.masterEnabled;
+    gainEnabled = settings.gainEnabled && settings.gainBoost > 0;
     radioFilterEnabled = settings.radioFilterEnabled;
     bitCrushEnabled = settings.bitCrushEnabled;
     fuzzEnabled = settings.fuzzEnabled;
@@ -86,49 +112,115 @@ class EffectEngine {
     crackleEnabled = settings.crackleEnabled;
     dropoutEnabled = settings.dropoutEnabled;
     pitchWobbleEnabled = settings.pitchWobbleEnabled;
+    lowPowerMode = settings.lowPowerMode;
+
+    // Chorus params
+    _chorus.enabled = settings.chorusEnabled;
+    _chorus.rate = settings.chorusRate;
+    _chorus.depth = settings.chorusDepth;
+    _chorus.wetMix = settings.chorusWetMix;
+
+    // Graphic EQ band gains
+    for (int i = 0; i < settings.eqBandGains.length && i < 5; i++) {
+      _graphicEq.setBand(i, settings.eqBandGains[i]);
+    }
+
+    // Convolution Reverb params
+    _convolutionReverb.enabled = settings.convolutionReverbEnabled;
+    _convolutionReverb.wetMix = settings.convolutionReverbMix;
+
+    // Formant Shifter params
+    _formantShifter.enabled = settings.formantShifterEnabled;
+    _formantShifter.shiftFactor = settings.formantShiftFactor;
+    _formantShifter.mix = settings.formantShiftMix;
+
+    // Low power mode overrides: disable reverb + pitch (most CPU-heavy)
+    if (lowPowerMode) {
+      reverbEnabled = false;
+      pitchWobbleEnabled = false;
+    }
   }
 
-  /// Process one chunk of raw PCM samples through all 10 effects.
+  /// Process one chunk of raw PCM samples through all DSP effects.
+  ///
+  /// Pipeline order (matching BOTH README.md & README2.MD):
+  ///   1. Gain Boost
+  ///   2. Radio/Telephone Bandpass Filter (300-3400 Hz)
+  ///      → GraphicEQ (Phase 3, runs alongside bandpass)
+  ///   3. Bit Crusher
+  ///   4. Soft Clip / Overdrive
+  ///   5. Hard Clip
+  ///      → Chorus/Flanger (Phase 3)
+  ///   6. Echo Delay (multi-tap)
+  ///   7. Room Reverb
+  ///      → Convolution Reverb (Phase 3)
+  ///   8. Crackle / Static Noise
+  ///   9. Voice Dropout
+  ///      → Formant Shifter (Phase 3)
+  ///   10. Pitch Wobble
   Int16List process(Int16List input) {
     if (input.isEmpty) return input;
 
     // Convert to normalized double for processing
     final samples = PcmUtils.toDoubles(input);
 
-    // Apply effects in order
+    // Master Enable gate: if master is OFF, bypass ALL effects
+    if (!masterEnabled) {
+      totalSamplesProcessed += samples.length;
+      totalChunksProcessed++;
+      return PcmUtils.toInt16(samples);
+    }
 
-    // Effect 1: Gain Boost (3x–5x volume amplification)
+    // ────── Stage 1: Gain Boost (3x–5x volume amplification) ──────
     if (gainEnabled) _applyGainBoost(samples);
 
-    // Effect 8: Bandpass Filter (300–3400 Hz — telephone effect)
+    // ────── Stage 2: Radio / Telephone Bandpass Filter (300–3400 Hz) ──────
     if (radioFilterEnabled) _bandpass.process(samples);
+    // GraphicEQ runs alongside but uses its own radioFilterEnabled toggle
+    _graphicEq.setRadioFilter(radioFilterEnabled);
+    _graphicEq.process(samples);
 
-    // Effect 6: Bit Crusher (6-bit quantization)
+    // ────── Stage 3: Bit Crusher (reduced bit-depth quantization) ──────
     if (bitCrushEnabled) _applyBitCrusher(samples);
 
-    // Effect 5: Soft Clip / Overdrive Distortion
+    // ────── Stage 4: Soft Clip / Overdrive Distortion ──────
     if (fuzzEnabled) _applySoftClip(samples);
 
-    // Effect 10: Hard Clipping at 60% threshold
+    // ────── Stage 5: Hard Clipping at threshold ──────
     if (clipEnabled) _applyHardClip(samples);
 
-    // Effect 2: Multi-tap Echo Delay (100ms + 250ms)
+    // ────── Stage 5b: Chorus / Flanger (Phase 3 — modulation) ──────
+    if (_chorus.enabled) _chorus.process(samples);
+
+    // ────── Stage 6: Multi-tap Echo Delay ──────
     if (echoEnabled) _applyEcho(samples);
 
-    // Effect 9: Reverb (large room Schroeder network)
+    // Mark echo as pre-warmed after first chunk processed
+    if (!_echoPreWarmed && echoEnabled) _echoPreWarmed = true;
+
+    // ────── Stage 7: Room Reverb (Schroeder network) ──────
     if (reverbEnabled) _applyReverb(samples);
 
-    // Effect 3: Crackle & Static Noise Injection
+    // ────── Stage 7b: Convolution Reverb (Phase 3 — FFT-based) ──────
+    if (_convolutionReverb.enabled) {
+      _convolutionReverb.process(samples);
+    }
+
+    // ────── Stage 8: Crackle & Static Noise Injection ──────
     if (crackleEnabled) _applyCrackleNoise(samples);
 
-    // Effect 4: Voice Dropout (chunk-level silence)
+    // ────── Stage 9: Voice Dropout (chunk-level silence) ──────
     if (dropoutEnabled) _applyDropout(samples);
 
-    // Effect 7: Pitch Wobble (configurable range)
+    // ────── Stage 9b: Formant Shifter (Phase 3 — LPC-based) ──────
+    if (_formantShifter.enabled) {
+      _formantShifter.process(samples);
+    }
+
+    // ────── Stage 10: Pitch Wobble (randomized resampling) ──────
     if (pitchWobbleEnabled) {
       _pitch.range = pitchWobbleRange;
       final wobbled = _pitch.process(samples);
-      // Ensure output length matches input
       final padded = PcmUtils.padOrTrim(wobbled, input.length);
       totalSamplesProcessed += padded.length;
       totalChunksProcessed++;
@@ -139,6 +231,18 @@ class EffectEngine {
     totalChunksProcessed++;
     return PcmUtils.toInt16(samples);
   }
+
+  /// Access the GraphicEQ module for fine-grained band control.
+  GraphicEQ get graphicEq => _graphicEq;
+
+  /// Access the ChorusFlanger module.
+  ChorusFlanger get chorus => _chorus;
+
+  /// Access the ConvolutionReverb module.
+  ConvolutionReverb get convolutionReverb => _convolutionReverb;
+
+  /// Access the FormantShifter module.
+  FormantShifter get formantShifter => _formantShifter;
 
   // ═══════════════════════════ Effect 1: Gain Boost ═══════════════════════════
   void _applyGainBoost(List<double> samples) {
@@ -179,6 +283,16 @@ class EffectEngine {
     final tap1Delay = echoDelay.round();
     final tap2Delay = (echoDelay * 2.5).round().clamp(0, AudioConstants.echoMaxDelayMs);
     final wet = echoDecay;
+
+    // Pre-warm: on first call, prime the echo buffer with input signal
+    // so the first echo taps produce audible output instead of silence.
+    if (!_echoPreWarmed) {
+      for (int i = 0; i < samples.length; i++) {
+        _echo.write(i, samples[i]);
+      }
+      _echo.advance(samples.length);
+    }
+
     for (int i = 0; i < samples.length; i++) {
       final echoTap1 = _echo.readAt(i, delayMs: tap1Delay);
       final echoTap2 = _echo.readAt(i, delayMs: tap2Delay);
@@ -225,6 +339,11 @@ class EffectEngine {
     _echo.reset();
     _reverb.reset();
     _pitch.reset();
+    _graphicEq.reset();
+    _chorus.reset();
+    _convolutionReverb.reset();
+    _formantShifter.reset();
+    _echoPreWarmed = false;
     totalChunksProcessed = 0;
     totalSamplesProcessed = 0;
   }
@@ -233,5 +352,9 @@ class EffectEngine {
     _echo.dispose();
     _reverb.dispose();
     _pitch.dispose();
+    _graphicEq.dispose();
+    _chorus.dispose();
+    _convolutionReverb.dispose();
+    _formantShifter.dispose();
   }
 }

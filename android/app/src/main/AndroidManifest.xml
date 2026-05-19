@@ -1,6 +1,5 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools"
-    package="com.chaosvoice">
+    xmlns:tools="http://schemas.android.com/tools">
 
     <!-- ===== PERMISSIONS ===== -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
@@ -17,6 +16,7 @@
         tools:ignore="ProtectedPermissions" />
 
     <application
+        android:name="${applicationName}"
         android:label="ChaosVoice"
         android:icon="@mipmap/ic_launcher"
         android:allowBackup="false"

@@ -91,6 +91,7 @@ class EffectDefaults {
   static const double reverbRoomSize = 0.45;
   static const double echoDelay = 100.0;
   static const double echoDecay = 1.0;
+  static const double pitchWobbleRange = 3.0;
   static const double echoMixDry = 0.70;
   static const double echoMix100 = 0.40;
   static const double echoMix250 = 0.25;

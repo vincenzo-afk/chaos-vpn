@@ -16,12 +16,12 @@ class ChaosVoiceAudioHandler extends BaseAudioHandler {
     _isInitialized = true;
 
     await AudioService.init(
-      config: const AudioServiceConfig(
+      config: AudioServiceConfig(
         androidNotificationChannelId: 'chaosvoice_channel',
         androidNotificationChannelName: 'ChaosVoice Service',
         androidNotificationOngoing: true,
         androidStopForegroundOnPause: false,
-        androidNotificationIcon: 'drawable/ic_mic_chaos',
+        androidNotificationIcon: 'ic_mic_chaos',
       ),
       builder: () => this,
     );
@@ -29,15 +29,7 @@ class ChaosVoiceAudioHandler extends BaseAudioHandler {
     AppLogger.info('[AudioService] Handler initialized');
   }
 
-  @override
-  Future<void> start() async {
+  Future<void> startService() async {
     AppLogger.info('[AudioService] Start requested');
-    await play();
-  }
-
-  @override
-  Future<void> stop() async {
-    AppLogger.info('[AudioService] Stop requested');
-    await AudioService.stop();
   }
 }

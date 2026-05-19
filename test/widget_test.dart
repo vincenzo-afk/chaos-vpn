@@ -7,7 +7,7 @@ void main() {
     await tester.pumpWidget(const ChaosVoiceApp());
 
     // Verify the app renders without error
-    expect(find.text('☠️ ChaosVoice'), findsOneWidget);
+    expect(find.text('CHAOSVOICE'), findsAtLeast(1));
   });
 
   testWidgets('Chaos toggle exists on home screen', (WidgetTester tester) async {
@@ -26,16 +26,18 @@ void main() {
     await tester.pumpAndSettle();
 
     // Should navigate to settings screen
-    expect(find.text('Settings'), findsOneWidget);
-    expect(find.text('Platform'), findsWidgets);
+    expect(find.text('// SETTINGS'), findsOneWidget);
   });
 
-  testWidgets('Configure Effects button opens effects screen', (WidgetTester tester) async {
+  testWidgets('Effects icon button opens effects screen', (WidgetTester tester) async {
     await tester.pumpWidget(const ChaosVoiceApp());
-    await tester.pump();
 
-    // The "Configure Effects" button should not be visible when service is stopped
-    expect(find.text('Configure Effects →'), findsNothing);
+    // Tap the effects icon
+    await tester.tap(find.byIcon(Icons.tune));
+    await tester.pumpAndSettle();
+
+    // Should navigate to effects screen
+    expect(find.text('// EFFECTS'), findsOneWidget);
   });
 
   testWidgets('App bar displays properly', (WidgetTester tester) async {

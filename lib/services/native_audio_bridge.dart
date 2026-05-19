@@ -13,7 +13,9 @@ class NativeAudioBridge {
   /// Start the native audio service.
   Future<bool> startService() async {
     try {
-      final result = await _channel.invokeMethod<bool>(ChannelMethods.startService) ?? false;
+      final result =
+          await _channel.invokeMethod<bool>(ChannelMethods.startService) ??
+              false;
       AppLogger.info('Native service started: $result');
       return result;
     } on PlatformException catch (e) {
@@ -25,7 +27,9 @@ class NativeAudioBridge {
   /// Stop the native audio service.
   Future<bool> stopService() async {
     try {
-      final result = await _channel.invokeMethod<bool>(ChannelMethods.stopService) ?? false;
+      final result =
+          await _channel.invokeMethod<bool>(ChannelMethods.stopService) ??
+              false;
       AppLogger.info('Native service stopped: $result');
       return result;
     } on PlatformException catch (e) {
@@ -34,13 +38,18 @@ class NativeAudioBridge {
     }
   }
 
-  /// Update DSP parameters in the native layer.
+  /// Update all DSP parameters in the native layer.
   Future<void> updateParams({
     required double gain,
     required double crackleIntensity,
     required double dropoutRate,
     required int bitCrushDepth,
     required double clipThreshold,
+    double reverbRoomSize = 0.45,
+    double fuzzDrive = 4.0,
+    double echoDelay = 100.0,
+    double echoDecay = 1.0,
+    double pitchWobbleRange = 3.0,
   }) async {
     try {
       await _channel.invokeMethod(ChannelMethods.updateParams, {
@@ -49,6 +58,11 @@ class NativeAudioBridge {
         'dropoutRate': dropoutRate,
         'bitCrushDepth': bitCrushDepth,
         'clipThreshold': clipThreshold,
+        'reverbRoomSize': reverbRoomSize,
+        'fuzzDrive': fuzzDrive,
+        'echoDelay': echoDelay,
+        'echoDecay': echoDecay,
+        'pitchWobbleRange': pitchWobbleRange,
       });
     } on PlatformException catch (e) {
       AppLogger.error('updateParams failed: ${e.message}');
@@ -58,7 +72,33 @@ class NativeAudioBridge {
   /// Check if native service is running.
   Future<bool> isServiceRunning() async {
     try {
-      return await _channel.invokeMethod<bool>(ChannelMethods.isRunning) ?? false;
+      return await _channel.invokeMethod<bool>(ChannelMethods.isRunning) ??
+          false;
+    } on PlatformException {
+      return false;
+    }
+  }
+
+  /// Set the audio routing mode (Android only).
+  Future<bool> setRoutingMode(String mode) async {
+    try {
+      final result =
+          await _channel.invokeMethod<bool>('setRoutingMode', {'mode': mode}) ??
+              false;
+      AppLogger.info('Routing mode set to: $mode');
+      return result;
+    } on PlatformException catch (e) {
+      AppLogger.error('setRoutingMode failed: ${e.message}');
+      return false;
+    }
+  }
+
+  /// Check if device is rooted (Android only).
+  Future<bool> isDeviceRooted() async {
+    try {
+      final result =
+          await _channel.invokeMethod<bool>('isDeviceRooted') ?? false;
+      return result;
     } on PlatformException {
       return false;
     }
