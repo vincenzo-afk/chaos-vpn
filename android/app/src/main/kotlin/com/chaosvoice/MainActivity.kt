@@ -223,7 +223,11 @@ class MainActivity : AudioServiceActivity() {
                 val granted = resultCode == Activity.RESULT_OK
                 pendingVpnResult?.success(granted)
                 pendingVpnResult = null
-                if (granted) ChaosVpnService.start(this)
+                if (granted) {
+                    ChaosVpnService.start(this)
+                } else {
+                    android.widget.Toast.makeText(this, "VPN permission required", android.widget.Toast.LENGTH_LONG).show()
+                }
             }
             REQUEST_MEDIA_PROJECTION -> {
                 val granted = resultCode == Activity.RESULT_OK && data != null

@@ -63,14 +63,11 @@ class ChaosStateNotifier extends StateNotifier<ChaosState> {
   // ─────────────────── V3 Full Launch Flow ──────────────────────────────────
 
   /// Complete V3 activation sequence:
-  /// 1. Request mic permission
-  /// 2. Request notification permission
-  /// 3. Request VPN permission (shows system dialog)
-  /// 4. Start VPN service
-  /// 5. Start ChaosProjectionService in foreground-only mode  ← CRITICAL: must happen BEFORE step 6
-  /// 6. Request MediaProjection permission (shows system dialog)
-  ///    → onActivityResult calls ChaosProjectionService.startWithProjectionData() automatically
-  /// 7. Request battery optimization exemption
+  /// 1. Request mic & notification permission
+  /// 2. Start ChaosProjectionService in foreground-only mode (empty)
+  /// 3. Request MediaProjection permission (shows system dialog)
+  /// 4. Request VPN permission (shows system dialog)
+  /// 5. Start processing / battery optimization
   Future<void> activateV3() async {
     state = state.copyWith(serviceStatus: ChaosServiceStatus.starting, clearError: true);
 
@@ -85,12 +82,26 @@ class ChaosStateNotifier extends StateNotifier<ChaosState> {
     }
     state = state.copyWith(hasMicPermission: true);
 
-    // Step 2: Notification permission
     if (Platform.isAndroid) {
       await _permissions.requestNotificationPermission();
     }
 
-    // Step 3: VPN permission (if not already granted)
+    // Step 2: Start foreground service FIRST (empty)
+    // This prevents crash on Android 14+ when requesting MediaProjection
+    await _bridge.startForegroundServiceOnly();
+    await Future.delayed(const Duration(seconds: 1)); // Wait for service to bind
+
+    // Step 3: MediaProjection permission (SECOND)
+    final projGranted = await _bridge.requestMediaProjection();
+    state = state.copyWith(mediaProjectionGranted: projGranted);
+
+    if (!projGranted) {
+      AppLogger.warn('[V3] MediaProjection denied — starting MIC fallback');
+      await _bridge.startService();
+    }
+    state = state.copyWith(projectionServiceRunning: projGranted);
+
+    // Step 4: VPN permission (THIRD)
     bool vpnPerm = await _bridge.isVpnPermissionGranted();
     if (!vpnPerm) {
       vpnPerm = await _bridge.requestVpnPermission();
@@ -105,38 +116,9 @@ class ChaosStateNotifier extends StateNotifier<ChaosState> {
       return;
     }
 
-    // Step 4: Start VPN service
+    // Step 5: Start processing (VPN service) (LAST)
     await _bridge.startVpnService();
     state = state.copyWith(vpnActive: true);
-
-    // Step 5: Start ChaosProjectionService in foreground-ONLY mode.
-    //
-    // CRITICAL: This MUST happen BEFORE step 6 (requesting MediaProjection).
-    //
-    // Android 14 enforces that a ForegroundService with foregroundServiceType=mediaProjection
-    // must already be in the foreground when the user grants the screen-capture dialog.
-    // If the service isn't running yet, getMediaProjection() throws SecurityException
-    // and the app crashes immediately after the user accepts the dialog.
-    //
-    // After the user accepts in step 6, MainActivity.onActivityResult() automatically
-    // calls ChaosProjectionService.startWithProjectionData() to begin audio processing.
-    await _bridge.startForegroundServiceOnly();
-    // Give the service 300ms to reach startForeground() before we show the dialog.
-    await Future.delayed(const Duration(milliseconds: 300));
-
-    // Step 6: MediaProjection permission
-    // onActivityResult in MainActivity handles the accepted token and passes it to the service.
-    final projGranted = await _bridge.requestMediaProjection();
-    state = state.copyWith(mediaProjectionGranted: projGranted);
-
-    if (!projGranted) {
-      // MediaProjection denied — fall back to mic capture
-      AppLogger.warn('[V3] MediaProjection denied — starting MIC fallback');
-      await _bridge.startService(); // fallback to VirtualMicService
-    }
-    // If projGranted=true, the service is already running with audio processing
-    // (started by MainActivity.onActivityResult → startWithProjectionData)
-    state = state.copyWith(projectionServiceRunning: projGranted);
 
     // Step 7: Battery optimization exemption
     final batteryOk = await _bridge.isBatteryOptimizationExempted();
