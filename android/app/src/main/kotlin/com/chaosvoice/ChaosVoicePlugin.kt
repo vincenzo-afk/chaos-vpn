@@ -1,11 +1,13 @@
 package com.chaosvoice
 
 import android.content.Context
+import android.os.Build
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler
 import io.flutter.plugin.common.MethodChannel.Result
+import java.io.File
 
 /**
  * Flutter plugin that bridges Dart calls to the native VirtualMicService.
@@ -55,18 +57,42 @@ class ChaosVoicePlugin : FlutterPlugin, MethodCallHandler {
                 result.success(true)
             }
             "isDeviceRooted" -> {
-                val rooted = try {
-                    val process = Runtime.getRuntime().exec(arrayOf("su", "-c", "id"))
-                    val reader = process.inputStream.bufferedReader()
-                    val line = reader.readLine()
-                    process.destroy()
-                    line?.contains("uid=0") == true
-                } catch (_: Exception) {
-                    false
-                }
+                val rooted = checkDeviceRootedSafe()
                 result.success(rooted)
             }
             else -> result.notImplemented()
+        }
+    }
+
+    private fun checkDeviceRootedSafe(): Boolean {
+        val buildTags = Build.TAGS
+        if (buildTags != null && buildTags.contains("test-keys")) {
+            return true
+        }
+        val paths = arrayOf(
+            "/system/app/Superuser.apk",
+            "/sbin/su",
+            "/system/bin/su",
+            "/system/xbin/su",
+            "/data/local/xbin/su",
+            "/data/local/bin/su",
+            "/system/sd/xbin/su",
+            "/system/bin/failsafe/su",
+            "/data/local/su"
+        )
+        for (path in paths) {
+            if (File(path).exists()) {
+                return true
+            }
+        }
+        return try {
+            val process = Runtime.getRuntime().exec(arrayOf("which", "su"))
+            val reader = process.inputStream.bufferedReader()
+            val line = reader.readLine()
+            process.destroy()
+            line != null
+        } catch (e: Exception) {
+            false
         }
     }
 }

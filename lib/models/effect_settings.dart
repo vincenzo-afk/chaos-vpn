@@ -4,6 +4,9 @@ class EffectSettings {
   // ─── Master ───
   final bool masterEnabled;
 
+  // ─── Intensity Preset ───
+  final String intensityPreset; // 'MILD', 'HEAVY', 'BRUTAL', 'EXTREME'
+
   // ─── Gain Boost ───
   final bool gainEnabled;
   final double gainBoost;
@@ -68,6 +71,7 @@ class EffectSettings {
 
   const EffectSettings({
     this.masterEnabled = true,
+    this.intensityPreset = 'BRUTAL',
     this.gainEnabled = true,
     this.gainBoost = 4.0,
     this.echoEnabled = true,
@@ -104,6 +108,7 @@ class EffectSettings {
   /// Create a copy with modified fields.
   EffectSettings copyWith({
     bool? masterEnabled,
+    String? intensityPreset,
     bool? gainEnabled,
     double? gainBoost,
     bool? echoEnabled,
@@ -138,6 +143,7 @@ class EffectSettings {
   }) {
     return EffectSettings(
       masterEnabled: masterEnabled ?? this.masterEnabled,
+      intensityPreset: intensityPreset ?? this.intensityPreset,
       gainEnabled: gainEnabled ?? this.gainEnabled,
       gainBoost: gainBoost ?? this.gainBoost,
       echoEnabled: echoEnabled ?? this.echoEnabled,
@@ -201,6 +207,7 @@ class EffectSettings {
 
   Map<String, dynamic> toJson() => {
         'masterEnabled': masterEnabled,
+        'intensityPreset': intensityPreset,
         'gainEnabled': gainEnabled,
         'gainBoost': gainBoost,
         'echoEnabled': echoEnabled,
@@ -237,6 +244,7 @@ class EffectSettings {
   static EffectSettings fromJson(Map<String, dynamic> json) {
     return EffectSettings(
       masterEnabled: json['masterEnabled'] as bool? ?? true,
+      intensityPreset: json['intensityPreset'] as String? ?? 'BRUTAL',
       gainEnabled: json['gainEnabled'] as bool? ?? true,
       gainBoost: (json['gainBoost'] as num?)?.toDouble() ?? 4.0,
       echoEnabled: json['echoEnabled'] as bool? ?? true,
@@ -288,6 +296,7 @@ class EffectSettings {
       other is EffectSettings &&
           runtimeType == other.runtimeType &&
           masterEnabled == other.masterEnabled &&
+          intensityPreset == other.intensityPreset &&
           gainEnabled == other.gainEnabled &&
           gainBoost == other.gainBoost &&
           echoEnabled == other.echoEnabled &&
@@ -323,6 +332,7 @@ class EffectSettings {
   @override
   int get hashCode => Object.hashAll([
         masterEnabled,
+        intensityPreset,
         gainEnabled,
         gainBoost,
         echoEnabled,

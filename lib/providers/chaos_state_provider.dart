@@ -6,7 +6,7 @@ import '../services/permission_service.dart';
 import '../services/native_audio_bridge.dart';
 import '../utils/logger.dart';
 
-/// StateNotifier that manages the global ChaosVoice app state.
+/// StateNotifier that manages the global ChaosVoice V3 app state.
 /// Includes crash recovery watchdog and boot persistence tracking.
 class ChaosStateNotifier extends StateNotifier<ChaosState> {
   final NativeAudioBridge _bridge;
@@ -14,6 +14,9 @@ class ChaosStateNotifier extends StateNotifier<ChaosState> {
 
   /// Periodic health check timer for crash recovery.
   Timer? _watchdogTimer;
+
+  /// Periodic earphone check.
+  Timer? _earphoneTimer;
 
   /// Track whether the service was previously active to detect crashes.
   bool _wasActive = false;
@@ -27,81 +30,51 @@ class ChaosStateNotifier extends StateNotifier<ChaosState> {
 
   /// Initialize: check permissions and service status on startup.
   Future<void> init() async {
-    final micGranted = await _permissions.hasMicPermission();
-    final notifGranted = await _permissions.hasNotificationPermission();
-    final running = await _bridge.isServiceRunning();
+    final micGranted    = await _permissions.hasMicPermission();
+    final notifGranted  = await _permissions.hasNotificationPermission();
+    final running       = await _bridge.isV3EngineRunning();
+    final vpnRunning    = await _bridge.isVpnRunning();
+    final vpnPerm       = await _bridge.isVpnPermissionGranted();
+    final projRunning   = await _bridge.isProjectionRunning();
+    final batteryOk     = await _bridge.isBatteryOptimizationExempted();
+    final earphones     = await _bridge.isEarphoneConnected();
 
     state = state.copyWith(
       hasMicPermission: micGranted,
       hasNotificationPermission: notifGranted,
-      serviceStatus:
-          running ? ChaosServiceStatus.active : ChaosServiceStatus.stopped,
+      serviceStatus: running ? ChaosServiceStatus.active : ChaosServiceStatus.stopped,
+      vpnActive: vpnRunning,
+      vpnPermissionGranted: vpnPerm,
+      projectionServiceRunning: projRunning,
+      batteryOptimizationExempted: batteryOk,
+      earphoneConnected: earphones,
     );
 
-    // If service was running from previous boot, restore active timestamp
     if (running) {
       _wasActive = true;
       state = state.copyWith(lastActiveTimestamp: DateTime.now());
       _startWatchdog();
-      AppLogger.info('[Provider] Service was already running on startup');
     }
 
-    AppLogger.info('[Provider] State initialized');
+    _startEarphoneMonitor();
+    AppLogger.info('[Provider V3] State initialized');
   }
 
-  /// Start a periodic health check that auto-restarts the service if killed.
-  void _startWatchdog() {
-    _watchdogTimer?.cancel();
-    _watchdogTimer = Timer.periodic(const Duration(seconds: 10), (_) async {
-      if (!state.isActive) {
-        // Service is expected to be stopped — no watchdog needed
-        return;
-      }
+  // ─────────────────── V3 Full Launch Flow ──────────────────────────────────
 
-      final running = await _bridge.isServiceRunning();
-      if (!running && _wasActive) {
-        // Service was killed (crash or OS kill) — attempt recovery
-        AppLogger.warn('[Provider] Service crashed — attempting recovery');
-        final recovered = await _bridge.startService();
-        if (recovered) {
-          state = state.copyWith(
-            crashRecoveryCount: state.crashRecoveryCount + 1,
-            lastActiveTimestamp: DateTime.now(),
-          );
-          AppLogger.info('[Provider] Crash recovery successful (${
-              state.crashRecoveryCount} total)');
-        } else {
-          state = state.copyWith(
-            serviceStatus: ChaosServiceStatus.error,
-            errorMessage:
-                'Service crashed ${state.crashRecoveryCount + 1} times. Recovery failed.',
-          );
-          _watchdogTimer?.cancel();
-        }
-      }
-      _wasActive = running;
-    });
-  }
+  /// Complete V3 activation sequence:
+  /// 1. Request mic permission
+  /// 2. Request notification permission
+  /// 3. Request VPN permission (shows system dialog)
+  /// 4. Start VPN service
+  /// 5. Start ChaosProjectionService in foreground-only mode  ← CRITICAL: must happen BEFORE step 6
+  /// 6. Request MediaProjection permission (shows system dialog)
+  ///    → onActivityResult calls ChaosProjectionService.startWithProjectionData() automatically
+  /// 7. Request battery optimization exemption
+  Future<void> activateV3() async {
+    state = state.copyWith(serviceStatus: ChaosServiceStatus.starting, clearError: true);
 
-  /// Stop the health check watchdog.
-  void _stopWatchdog() {
-    _watchdogTimer?.cancel();
-    _watchdogTimer = null;
-    _wasActive = false;
-  }
-
-  /// Toggle the audio service on/off.
-  Future<void> toggleService() async {
-    if (state.isActive) {
-      await stopService();
-    } else {
-      await startService();
-    }
-  }
-
-  /// Start the native audio service.
-  Future<void> startService() async {
-    // Ensure mic permission first
+    // Step 1: Mic permission
     final micOk = await _permissions.requestMicPermission();
     if (!micOk) {
       state = state.copyWith(
@@ -110,44 +83,169 @@ class ChaosStateNotifier extends StateNotifier<ChaosState> {
       );
       return;
     }
+    state = state.copyWith(hasMicPermission: true);
 
-    state = state.copyWith(
-      serviceStatus: ChaosServiceStatus.starting,
-      clearError: true,
-      hasMicPermission: true,
-    );
+    // Step 2: Notification permission
+    if (Platform.isAndroid) {
+      await _permissions.requestNotificationPermission();
+    }
 
-    final started = await _bridge.startService();
-    if (started) {
-      state = state.copyWith(
-        serviceStatus: ChaosServiceStatus.active,
-        lastActiveTimestamp: DateTime.now(),
-      );
-      _wasActive = true;
-      _startWatchdog();
-      AppLogger.info('[Provider] Service started successfully');
-    } else {
+    // Step 3: VPN permission (if not already granted)
+    bool vpnPerm = await _bridge.isVpnPermissionGranted();
+    if (!vpnPerm) {
+      vpnPerm = await _bridge.requestVpnPermission();
+    }
+    state = state.copyWith(vpnPermissionGranted: vpnPerm);
+
+    if (!vpnPerm) {
       state = state.copyWith(
         serviceStatus: ChaosServiceStatus.error,
-        errorMessage: 'Failed to start audio service.',
+        errorMessage: 'VPN permission is required for background operation.',
       );
+      return;
     }
+
+    // Step 4: Start VPN service
+    await _bridge.startVpnService();
+    state = state.copyWith(vpnActive: true);
+
+    // Step 5: Start ChaosProjectionService in foreground-ONLY mode.
+    //
+    // CRITICAL: This MUST happen BEFORE step 6 (requesting MediaProjection).
+    //
+    // Android 14 enforces that a ForegroundService with foregroundServiceType=mediaProjection
+    // must already be in the foreground when the user grants the screen-capture dialog.
+    // If the service isn't running yet, getMediaProjection() throws SecurityException
+    // and the app crashes immediately after the user accepts the dialog.
+    //
+    // After the user accepts in step 6, MainActivity.onActivityResult() automatically
+    // calls ChaosProjectionService.startWithProjectionData() to begin audio processing.
+    await _bridge.startForegroundServiceOnly();
+    // Give the service 300ms to reach startForeground() before we show the dialog.
+    await Future.delayed(const Duration(milliseconds: 300));
+
+    // Step 6: MediaProjection permission
+    // onActivityResult in MainActivity handles the accepted token and passes it to the service.
+    final projGranted = await _bridge.requestMediaProjection();
+    state = state.copyWith(mediaProjectionGranted: projGranted);
+
+    if (!projGranted) {
+      // MediaProjection denied — fall back to mic capture
+      AppLogger.warn('[V3] MediaProjection denied — starting MIC fallback');
+      await _bridge.startService(); // fallback to VirtualMicService
+    }
+    // If projGranted=true, the service is already running with audio processing
+    // (started by MainActivity.onActivityResult → startWithProjectionData)
+    state = state.copyWith(projectionServiceRunning: projGranted);
+
+    // Step 7: Battery optimization exemption
+    final batteryOk = await _bridge.isBatteryOptimizationExempted();
+    if (!batteryOk) {
+      await _bridge.requestBatteryOptimizationExemption();
+      // Don't block on this — user can dismiss and app still works
+    }
+    final batteryNow = await _bridge.isBatteryOptimizationExempted();
+    state = state.copyWith(batteryOptimizationExempted: batteryNow);
+
+    // Check earphones
+    final earphones = await _bridge.isEarphoneConnected();
+    state = state.copyWith(earphoneConnected: earphones);
+
+    state = state.copyWith(
+      serviceStatus: ChaosServiceStatus.active,
+      lastActiveTimestamp: DateTime.now(),
+      clearError: true,
+    );
+    _wasActive = true;
+    _startWatchdog();
+    _startEarphoneMonitor();
+
+    AppLogger.info('[V3] Engine activated. Projection=$projGranted, VPN=true');
   }
 
-  /// Stop the native audio service.
-  Future<void> stopService() async {
-    await _bridge.stopService();
+  /// Stop all V3 services.
+  Future<void> deactivateV3() async {
+    await _bridge.stopV3Engine();
     state = state.copyWith(
       serviceStatus: ChaosServiceStatus.stopped,
+      vpnActive: false,
+      projectionServiceRunning: false,
       clearError: true,
-      // Keep lastActiveTimestamp for boot persistence display
     );
     _wasActive = false;
     _stopWatchdog();
-    AppLogger.info('[Provider] Service stopped');
+    AppLogger.info('[V3] Engine deactivated');
   }
 
-  /// Record the name of the currently active preset.
+  /// Toggle V3 engine on/off.
+  Future<void> toggleService() async {
+    if (state.isActive) {
+      await deactivateV3();
+    } else {
+      await activateV3();
+    }
+  }
+
+  // ─────────────── Legacy V1/V2 compat methods ──────────────────────────────
+
+  Future<void> startService() async => activateV3();
+  Future<void> stopService() async => deactivateV3();
+
+  // ─────────────── Watchdog ──────────────────────────────────────────────────
+
+  /// Start a periodic health check that auto-restarts the service if killed.
+  void _startWatchdog() {
+    _watchdogTimer?.cancel();
+    _watchdogTimer = Timer.periodic(const Duration(seconds: 10), (_) async {
+      if (!state.isActive) return;
+
+      final running = await _bridge.isV3EngineRunning();
+      if (!running && _wasActive) {
+        AppLogger.warn('[V3] Service crashed — attempting recovery');
+        final vpnOk = await _bridge.startVpnService();
+        final svcOk = state.projectionServiceRunning
+            ? await _bridge.startProjectionService()
+            : await _bridge.startService();
+
+        if (vpnOk || svcOk) {
+          state = state.copyWith(
+            crashRecoveryCount: state.crashRecoveryCount + 1,
+            lastActiveTimestamp: DateTime.now(),
+            vpnActive: vpnOk,
+          );
+          AppLogger.info('[V3] Recovery successful (${state.crashRecoveryCount})');
+        } else {
+          state = state.copyWith(
+            serviceStatus: ChaosServiceStatus.error,
+            errorMessage: 'Service crashed and failed to recover.',
+          );
+          _stopWatchdog();
+        }
+      }
+      _wasActive = running;
+    });
+  }
+
+  void _stopWatchdog() {
+    _watchdogTimer?.cancel();
+    _watchdogTimer = null;
+    _wasActive = false;
+  }
+
+  /// Monitor earphone status every 5 seconds.
+  void _startEarphoneMonitor() {
+    _earphoneTimer?.cancel();
+    _earphoneTimer = Timer.periodic(const Duration(seconds: 5), (_) async {
+      final connected = await _bridge.isEarphoneConnected();
+      if (connected != state.earphoneConnected) {
+        state = state.copyWith(earphoneConnected: connected);
+        AppLogger.info('[V3] Earphone status changed: $connected');
+      }
+    });
+  }
+
+  // ─────────────── Misc state mutators ──────────────────────────────────────
+
   void setPresetName(String? name) {
     state = state.copyWith(
       lastPresetName: name,
@@ -155,31 +253,25 @@ class ChaosStateNotifier extends StateNotifier<ChaosState> {
     );
   }
 
-  /// Update current RMS level from audio stream.
   void updateRmsLevel(double rms) {
     state = state.copyWith(currentRmsLevel: rms);
   }
 
-  /// Update sample rate setting.
   void setSampleRate(int rate) {
     state = state.copyWith(sampleRate: rate);
-    AppLogger.info('[Provider] Sample rate set to $rate');
   }
 
-  /// Update buffer size setting.
   void setBufferSize(int size) {
     state = state.copyWith(bufferSize: size);
-    AppLogger.info('[Provider] Buffer size set to $size');
   }
 
-  /// Clear any error message.
   void clearError() {
     state = state.copyWith(clearError: true);
   }
 
-  /// Reset entire state to defaults.
   void reset() {
     _stopWatchdog();
+    _earphoneTimer?.cancel();
     state = ChaosState(
       isAndroid: Platform.isAndroid,
       isIOS: Platform.isIOS,
@@ -190,6 +282,7 @@ class ChaosStateNotifier extends StateNotifier<ChaosState> {
   @override
   void dispose() {
     _stopWatchdog();
+    _earphoneTimer?.cancel();
     super.dispose();
   }
 }

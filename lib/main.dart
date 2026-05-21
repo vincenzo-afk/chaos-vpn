@@ -83,7 +83,7 @@ class ChaosVoiceApp extends ConsumerWidget {
           letterSpacing: 3,
         ),
       ),
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         color: const Color(0xFF111111),
         elevation: 2,
         shape: RoundedRectangleBorder(

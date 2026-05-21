@@ -1,4 +1,4 @@
-/// App state for ChaosVoice.
+/// App state for ChaosVoice V3.
 enum ChaosServiceStatus {
   /// Service is stopped / inactive.
   stopped,
@@ -13,7 +13,7 @@ enum ChaosServiceStatus {
   error,
 }
 
-/// Holds the complete state of the ChaosVoice app.
+/// Holds the complete state of the ChaosVoice V3 app.
 class ChaosState {
   final ChaosServiceStatus serviceStatus;
   final bool hasMicPermission;
@@ -35,6 +35,26 @@ class ChaosState {
   /// Number of times the service has been auto-recovered after a crash.
   final int crashRecoveryCount;
 
+  // ── V3: VPN + Projection status ──────────────────────────────────────────
+
+  /// Whether the fake VPN service is active.
+  final bool vpnActive;
+
+  /// Whether the user has granted VPN permission.
+  final bool vpnPermissionGranted;
+
+  /// Whether the MediaProjection permission has been granted.
+  final bool mediaProjectionGranted;
+
+  /// Whether the ChaosProjectionService is running.
+  final bool projectionServiceRunning;
+
+  /// Whether battery optimization is disabled for this app.
+  final bool batteryOptimizationExempted;
+
+  /// Whether wired or Bluetooth earphones are connected.
+  final bool earphoneConnected;
+
   const ChaosState({
     this.serviceStatus = ChaosServiceStatus.stopped,
     this.hasMicPermission = false,
@@ -44,11 +64,18 @@ class ChaosState {
     this.currentRmsLevel = 0.0,
     this.errorMessage,
     this.platformName = '',
-    this.sampleRate = 16000,
-    this.bufferSize = 320,
+    this.sampleRate = 48000,
+    this.bufferSize = 1920,
     this.lastActiveTimestamp,
     this.lastPresetName,
     this.crashRecoveryCount = 0,
+    // V3 defaults
+    this.vpnActive = false,
+    this.vpnPermissionGranted = false,
+    this.mediaProjectionGranted = false,
+    this.projectionServiceRunning = false,
+    this.batteryOptimizationExempted = false,
+    this.earphoneConnected = false,
   });
 
   ChaosState copyWith({
@@ -68,6 +95,13 @@ class ChaosState {
     String? lastPresetName,
     bool? clearLastPresetName,
     int? crashRecoveryCount,
+    // V3 fields
+    bool? vpnActive,
+    bool? vpnPermissionGranted,
+    bool? mediaProjectionGranted,
+    bool? projectionServiceRunning,
+    bool? batteryOptimizationExempted,
+    bool? earphoneConnected,
   }) {
     return ChaosState(
       serviceStatus: serviceStatus ?? this.serviceStatus,
@@ -88,10 +122,32 @@ class ChaosState {
           ? null
           : (lastPresetName ?? this.lastPresetName),
       crashRecoveryCount: crashRecoveryCount ?? this.crashRecoveryCount,
+      vpnActive: vpnActive ?? this.vpnActive,
+      vpnPermissionGranted: vpnPermissionGranted ?? this.vpnPermissionGranted,
+      mediaProjectionGranted: mediaProjectionGranted ?? this.mediaProjectionGranted,
+      projectionServiceRunning: projectionServiceRunning ?? this.projectionServiceRunning,
+      batteryOptimizationExempted:
+          batteryOptimizationExempted ?? this.batteryOptimizationExempted,
+      earphoneConnected: earphoneConnected ?? this.earphoneConnected,
     );
   }
 
-  bool get isActive => serviceStatus == ChaosServiceStatus.active;
+  bool get isActive =>
+      serviceStatus == ChaosServiceStatus.active ||
+      projectionServiceRunning ||
+      vpnActive;
+
+  /// True if all V3 systems are up.
+  bool get isFullV3Active => vpnActive && projectionServiceRunning;
+
+  /// Number of V3 setup steps completed out of 3.
+  int get v3SetupProgress {
+    int count = 0;
+    if (vpnPermissionGranted) count++;
+    if (mediaProjectionGranted) count++;
+    if (batteryOptimizationExempted) count++;
+    return count;
+  }
 
   /// Human-readable uptime since last active timestamp.
   String get uptimeText {
@@ -123,7 +179,13 @@ class ChaosState {
           bufferSize == other.bufferSize &&
           lastActiveTimestamp == other.lastActiveTimestamp &&
           lastPresetName == other.lastPresetName &&
-          crashRecoveryCount == other.crashRecoveryCount;
+          crashRecoveryCount == other.crashRecoveryCount &&
+          vpnActive == other.vpnActive &&
+          vpnPermissionGranted == other.vpnPermissionGranted &&
+          mediaProjectionGranted == other.mediaProjectionGranted &&
+          projectionServiceRunning == other.projectionServiceRunning &&
+          batteryOptimizationExempted == other.batteryOptimizationExempted &&
+          earphoneConnected == other.earphoneConnected;
 
   @override
   int get hashCode => Object.hash(
@@ -140,5 +202,11 @@ class ChaosState {
         lastActiveTimestamp,
         lastPresetName,
         crashRecoveryCount,
+        vpnActive,
+        vpnPermissionGranted,
+        mediaProjectionGranted,
+        projectionServiceRunning,
+        batteryOptimizationExempted,
+        earphoneConnected,
       );
 }

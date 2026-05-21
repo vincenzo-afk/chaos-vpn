@@ -29,6 +29,7 @@ class EffectSettingsNotifier extends StateNotifier<EffectSettings> {
       dropoutRate: settings.dropoutRate,
       bitCrushDepth: settings.bitCrushDepth,
       clipThreshold: settings.clipThreshold,
+      intensityPreset: settings.intensityPreset,
       reverbRoomSize: settings.reverbRoomSize,
       fuzzDrive: settings.fuzzDrive,
       echoDelay: settings.echoDelay,

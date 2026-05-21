@@ -165,6 +165,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
+            // ── V3 Status Panel ──
+            _buildV3StatusPanel(chaosState),
+            const SizedBox(height: 8),
+
             // ── Routing Mode Badge ──
             _buildRoutingModeBadge(),
 
@@ -229,6 +233,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             // ── Error message ──
             if (chaosState.errorMessage != null)
               _buildErrorCard(chaosState.errorMessage!),
+
+            // ── Earphone warning ──
+            if (chaosState.isActive && !chaosState.earphoneConnected)
+              _buildEarphoneWarning(),
 
             // ── Permission request ──
             if (!chaosState.hasMicPermission && !chaosState.isActive)
@@ -579,7 +587,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         Text(
-          'v1.0.0',
+          'v3.0.0',
           style: TextStyle(
             color: Colors.grey.withOpacity(0.3),
             fontSize: 10,
@@ -615,6 +623,160 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             ),
           ),
       ],
+    );
+  }
+  /// V3 status panel showing VPN / Projection / Earphone states.
+  Widget _buildV3StatusPanel(ChaosState state) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0D0D0D),
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: const Color(0xFF1A1A1A)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            '// V3 ENGINE STATUS',
+            style: TextStyle(
+              color: Color(0xFF444444),
+              fontSize: 9,
+              fontFamily: 'monospace',
+              fontWeight: FontWeight.w700,
+              letterSpacing: 2,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              _buildV3StatusChip(
+                'VPN',
+                state.vpnActive,
+                state.vpnPermissionGranted,
+                Icons.security,
+              ),
+              const SizedBox(width: 8),
+              _buildV3StatusChip(
+                'PROJECTION',
+                state.projectionServiceRunning,
+                state.mediaProjectionGranted,
+                Icons.screen_share,
+              ),
+              const SizedBox(width: 8),
+              _buildV3StatusChip(
+                'BATTERY',
+                state.batteryOptimizationExempted,
+                state.batteryOptimizationExempted,
+                Icons.battery_charging_full,
+              ),
+              const SizedBox(width: 8),
+              _buildV3StatusChip(
+                'EARPHONES',
+                state.earphoneConnected,
+                state.earphoneConnected,
+                Icons.headphones,
+              ),
+            ],
+          ),
+          if (!state.isActive && state.v3SetupProgress < 3) ...
+          [
+            const SizedBox(height: 6),
+            LinearProgressIndicator(
+              value: state.v3SetupProgress / 3.0,
+              backgroundColor: const Color(0xFF1A1A1A),
+              valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFFFF4500)),
+              minHeight: 2,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Setup: ${state.v3SetupProgress}/3 permissions granted',
+              style: const TextStyle(
+                color: Color(0xFF555555),
+                fontSize: 9,
+                fontFamily: 'monospace',
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildV3StatusChip(
+    String label,
+    bool active,
+    bool granted,
+    IconData icon,
+  ) {
+    final color = active
+        ? const Color(0xFF00FF41)
+        : granted
+            ? const Color(0xFFFF4500)
+            : const Color(0xFF333333);
+    final text = active ? '●' : (granted ? '◌' : '○');
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.06),
+          borderRadius: BorderRadius.circular(3),
+          border: Border.all(color: color.withOpacity(0.2)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 12, color: color),
+            const SizedBox(height: 3),
+            Text(
+              text,
+              style: TextStyle(color: color, fontSize: 8, fontFamily: 'monospace'),
+            ),
+            Text(
+              label,
+              style: TextStyle(
+                color: color.withOpacity(0.7),
+                fontSize: 7,
+                fontFamily: 'monospace',
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.5,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Warning when active but no earphones detected.
+  Widget _buildEarphoneWarning() {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(top: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFAA00).withOpacity(0.08),
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: const Color(0xFFFFAA00).withOpacity(0.3)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.headset_off, color: Color(0xFFFFAA00), size: 14),
+          const SizedBox(width: 8),
+          const Expanded(
+            child: Text(
+              '⚠ No earphones detected. Plug in earphones for best results. '  
+              'Without them, the other person may hear your clean voice first.',
+              style: TextStyle(
+                color: Color(0xFFFFAA00),
+                fontSize: 10,
+                fontFamily: 'monospace',
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

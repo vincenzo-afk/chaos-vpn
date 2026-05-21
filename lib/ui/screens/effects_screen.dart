@@ -385,6 +385,9 @@ class _EffectsScreenState extends ConsumerState<EffectsScreen> {
           // 11. Dropout → 11b. Formant Shifter → 12. Pitch Wobble
           // ═══════════════════════════════════════════════════════════
 
+          // ── Harshness Intensity Preset ──
+          _buildIntensitySection(settings),
+
           // ── Spectrogram Visualizer ──
           _buildSpectrogramSection(settings),
 
@@ -625,6 +628,116 @@ class _EffectsScreenState extends ConsumerState<EffectsScreen> {
           ),
 
           const SizedBox(height: 24),
+        ],
+      ),
+    );
+  }
+
+  /// Build the harshness intensity preset selector section.
+  Widget _buildIntensitySection(EffectSettings settings) {
+    const presets = ['MILD', 'HEAVY', 'BRUTAL', 'EXTREME'];
+    const colors = {
+      'MILD': Color(0xFF00FF88),
+      'HEAVY': Color(0xFFFFCC00),
+      'BRUTAL': Color(0xFFFF5500),
+      'EXTREME': Color(0xFFFF0033),
+    };
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFF111111),
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(
+          color: const Color(0xFFFF4500).withOpacity(0.08),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: colors[settings.intensityPreset.toUpperCase()]?.withOpacity(0.1) ?? const Color(0xFFFF4500).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Icon(
+                  Icons.offline_bolt,
+                  size: 18,
+                  color: colors[settings.intensityPreset.toUpperCase()] ?? const Color(0xFFFF4500),
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Text(
+                'HARSHNESS PRESET',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  fontFamily: 'monospace',
+                  letterSpacing: 1,
+                  color: Colors.white,
+                ),
+              ),
+              const Spacer(),
+              Text(
+                settings.intensityPreset.toUpperCase(),
+                style: TextStyle(
+                  fontSize: 10,
+                  fontFamily: 'monospace',
+                  fontWeight: FontWeight.bold,
+                  color: colors[settings.intensityPreset.toUpperCase()] ?? const Color(0xFFFF4500),
+                  letterSpacing: 1,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: presets.map((p) {
+              final isSelected = settings.intensityPreset.toUpperCase() == p;
+              final color = colors[p]!;
+              return Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 2.0),
+                  child: InkWell(
+                    onTap: () {
+                      _updateSettings(settings.copyWith(intensityPreset: p));
+                    },
+                    borderRadius: BorderRadius.circular(4),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 150),
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      decoration: BoxDecoration(
+                        color: isSelected ? color.withOpacity(0.15) : const Color(0xFF070707),
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(
+                          color: isSelected ? color : const Color(0xFF1E1E1E),
+                          width: 1.5,
+                        ),
+                      ),
+                      child: Center(
+                        child: Text(
+                          p,
+                          style: TextStyle(
+                            fontSize: 9,
+                            fontFamily: 'monospace',
+                            fontWeight: FontWeight.bold,
+                            color: isSelected ? color : Colors.grey.withOpacity(0.4),
+                            letterSpacing: 1,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
         ],
       ),
     );

@@ -5,7 +5,9 @@ import android.media.AudioFormat
 import android.media.AudioManager
 import android.media.AudioTrack
 import android.media.AudioAttributes
+import android.os.Build
 import android.util.Log
+import java.io.File
 
 /**
  * Root-level audio router for system-wide mic injection on rooted Android devices.
@@ -43,17 +45,35 @@ class RootAudioRouter(private val context: Context) {
     private var isRootModeActive = false
 
     /**
-     * Check if the device is rooted by attempting to execute `su`.
+     * Check if the device is rooted by verifying su path or executing which.
      */
     fun isDeviceRooted(): Boolean {
+        val buildTags = Build.TAGS
+        if (buildTags != null && buildTags.contains("test-keys")) {
+            return true
+        }
+        val paths = arrayOf(
+            "/system/app/Superuser.apk",
+            "/sbin/su",
+            "/system/bin/su",
+            "/system/xbin/su",
+            "/data/local/xbin/su",
+            "/data/local/bin/su",
+            "/system/sd/xbin/su",
+            "/system/bin/failsafe/su",
+            "/data/local/su"
+        )
+        for (path in paths) {
+            if (File(path).exists()) {
+                return true
+            }
+        }
         return try {
-            val process = Runtime.getRuntime().exec(arrayOf("su", "-c", "id"))
+            val process = Runtime.getRuntime().exec(arrayOf("which", "su"))
             val reader = process.inputStream.bufferedReader()
             val line = reader.readLine()
-            val rooted = line?.contains("uid=0") == true
             process.destroy()
-            Log.d(TAG, "Root check: $rooted")
-            rooted
+            line != null
         } catch (e: Exception) {
             Log.d(TAG, "Root check failed: ${e.message}")
             false
