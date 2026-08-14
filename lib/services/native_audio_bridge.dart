@@ -42,6 +42,10 @@ class NativeAudioBridge {
   }
 
   /// Update all DSP parameters in the native layer.
+  ///
+  /// Bug fix: this now forwards the complete parameter surface (core DSP,
+  /// effect enable flags and the advanced chorus/EQ/convolution/formant
+  /// sections) so the native engine honors every UI control.
   Future<void> updateParams({
     required double gain,
     required double crackleIntensity,
@@ -60,6 +64,30 @@ class NativeAudioBridge {
     double echoDelay = 100.0,
     double echoDecay = 1.0,
     double pitchWobbleRange = 3.0,
+    // ── Effect toggle chain ──
+    bool masterEnabled = true,
+    bool gainEnabled = true,
+    bool echoEnabled = true,
+    bool reverbEnabled = true,
+    bool crackleEnabled = true,
+    bool dropoutEnabled = true,
+    bool fuzzEnabled = true,
+    bool bitCrushEnabled = true,
+    bool pitchWobbleEnabled = true,
+    bool radioFilterEnabled = true,
+    bool clipEnabled = true,
+    // ── Advanced sections ──
+    bool chorusEnabled = false,
+    double chorusRate = 0.25,
+    double chorusDepth = 10.0,
+    double chorusWetMix = 0.5,
+    List<double>? eqBandGains,
+    bool convolutionReverbEnabled = false,
+    double convolutionReverbMix = 0.45,
+    bool formantShifterEnabled = false,
+    double formantShiftFactor = 1.0,
+    double formantShiftMix = 1.0,
+    bool lowPowerMode = false,
   }) async {
     try {
       await _channel.invokeMethod(ChannelMethods.updateParams, {
@@ -79,6 +107,30 @@ class NativeAudioBridge {
         'echoDelay': echoDelay,
         'echoDecay': echoDecay,
         'pitchWobbleRange': pitchWobbleRange,
+        // ── Effect toggle chain ──
+        'masterEnabled': masterEnabled,
+        'gainEnabled': gainEnabled,
+        'echoEnabled': echoEnabled,
+        'reverbEnabled': reverbEnabled,
+        'crackleEnabled': crackleEnabled,
+        'dropoutEnabled': dropoutEnabled,
+        'fuzzEnabled': fuzzEnabled,
+        'bitCrushEnabled': bitCrushEnabled,
+        'pitchWobbleEnabled': pitchWobbleEnabled,
+        'radioFilterEnabled': radioFilterEnabled,
+        'clipEnabled': clipEnabled,
+        // ── Advanced sections ──
+        'chorusEnabled': chorusEnabled,
+        'chorusRate': chorusRate,
+        'chorusDepth': chorusDepth,
+        'chorusWetMix': chorusWetMix,
+        'eqBandGains': eqBandGains ?? [0.0, 0.0, 0.0, 0.0, 0.0],
+        'convolutionReverbEnabled': convolutionReverbEnabled,
+        'convolutionReverbMix': convolutionReverbMix,
+        'formantShifterEnabled': formantShifterEnabled,
+        'formantShiftFactor': formantShiftFactor,
+        'formantShiftMix': formantShiftMix,
+        'lowPowerMode': lowPowerMode,
       });
     } on PlatformException catch (e) {
       AppLogger.error('updateParams failed: ${e.message}');

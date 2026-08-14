@@ -47,7 +47,11 @@ class EchoBuffer {
     _writeHead = 0;
   }
 
+  /// Clear the buffer contents without reallocating the list.
+  /// Bug fix: the previous implementation replaced `_buffer` with a new
+  /// (empty) list while the engine kept a reference to the old list via
+  /// its `late final` field, leaving processing writes into a dead buffer.
   void dispose() {
-    _buffer = List<double>.filled(0, 0.0);
+    reset();
   }
 }

@@ -176,9 +176,11 @@ class EffectEngine {
 
     // ────── Stage 2: Radio / Telephone Bandpass Filter (300–3400 Hz) ──────
     if (radioFilterEnabled) _bandpass.process(samples);
-    // GraphicEQ runs alongside but uses its own radioFilterEnabled toggle
+    // GraphicEQ runs alongside but only when the radio/telephone chain
+    // is enabled — previously it always ran, applying EQ even when the
+    // chain was toggled off.
     _graphicEq.setRadioFilter(radioFilterEnabled);
-    _graphicEq.process(samples);
+    if (radioFilterEnabled) _graphicEq.process(samples);
 
     // ────── Stage 3: Bit Crusher (reduced bit-depth quantization) ──────
     if (bitCrushEnabled) _applyBitCrusher(samples);
@@ -269,9 +271,14 @@ class EffectEngine {
 
   // ══════════════════════════ Effect 10: Hard Clip ══════════════════════════════
   void _applyHardClip(List<double> samples) {
+    // Bug fix: the previous implementation clamped to the threshold and then
+    // divided by it, mapping the threshold back to ±1.0 — which amplified the
+    // signal to full scale AFTER clipping, defeating the purpose of a hard
+    // clip and causing harsh square-wave distortion at maximum amplitude.
+    // Hard clipping now simply flattens peaks at [clipThreshold] and leaves
+    // the overall level in place; final limiting happens at PCM conversion.
     for (int i = 0; i < samples.length; i++) {
       samples[i] = samples[i].clamp(-clipThreshold, clipThreshold);
-      samples[i] /= clipThreshold;
     }
   }
 

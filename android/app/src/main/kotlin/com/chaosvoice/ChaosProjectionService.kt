@@ -296,8 +296,11 @@ class ChaosProjectionService : Service() {
         running.set(true)
         isRunning = true
 
-        audioRecord?.startRecording()
-        captureRecord?.startRecording()
+        // Guard: only start recording on sources that were actually created.
+        // Starting a null record throws IllegalStateException; starting one in
+        // an uninitialized state leaves the DSP loop with no input forever.
+        audioRecord?.takeIf { it.state == AudioRecord.STATE_INITIALIZED }?.startRecording()
+        captureRecord?.takeIf { it.state == AudioRecord.STATE_INITIALIZED }?.startRecording()
         audioTrack?.play()
 
         processingThread = Thread {
@@ -395,8 +398,16 @@ class ChaosProjectionService : Service() {
 
     /**
      * Fall back to direct MIC capture.
+     *
+     * Bug fix: the previous implementation silently left [audioRecord] null
+     * when the platform rejected the requested format or a record was already
+     * in use (ERROR_INVALID_OPERATION), which caused the processing loop to
+     * run forever reading from nothing. This now verifies the record's state
+     * and reports failure so the caller can react.
+     *
+     * @return true if a usable AudioRecord was created
      */
-    private fun setupMicCapture() {
+    private fun setupMicCapture(): Boolean {
         val minBuf = AudioRecord.getMinBufferSize(SAMPLE_RATE, CHANNEL_IN, ENCODING)
         val bufSize = maxOf(minBuf, BUFFER_BYTES)
         try {
@@ -407,8 +418,19 @@ class ChaosProjectionService : Service() {
                 ENCODING,
                 bufSize
             )
+            val record = audioRecord
+            if (record == null || record.state != AudioRecord.STATE_INITIALIZED) {
+                Log.e(TAG, "Mic AudioRecord not initialized (state=${record?.state})")
+                audioRecord?.release()
+                audioRecord = null
+                return false
+            }
+            return true
         } catch (e: Exception) {
             Log.e(TAG, "Mic capture setup failed: ${e.message}")
+            audioRecord?.release()
+            audioRecord = null
+            return false
         }
     }
 
@@ -451,6 +473,13 @@ class ChaosProjectionService : Service() {
         val buffer  = ShortArray(BUFFER_SAMPLES)
         val output  = ShortArray(BUFFER_SAMPLES)
 
+        // Bug fix: track consecutive read failures so the loop exits instead of
+        // spinning forever when both capture sources are unusable (this was the
+        // silent-lock bug: an AudioRecord that failed to initialize left this
+        // loop running with no input and no output).
+        var consecutiveReadFailures = 0
+        val maxConsecutiveFailures = 150 // ~3 seconds at 20ms/poll
+
         while (running.get()) {
             try {
                 // Pick whichever record source is active (projection preferred, mic fallback)
@@ -465,11 +494,18 @@ class ChaosProjectionService : Service() {
                 when {
                     read == AudioRecord.ERROR_BAD_VALUE ||
                     read == AudioRecord.ERROR_INVALID_OPERATION -> {
+                        consecutiveReadFailures++
+                        if (consecutiveReadFailures >= maxConsecutiveFailures) {
+                            Log.e(TAG, "Capture source permanently unreadable (state=${rec.state}) — stopping engine")
+                            running.set(false)
+                            break
+                        }
                         Thread.sleep(30); continue
                     }
                     read <= 0 -> {
                         Thread.sleep(10); continue
                     }
+                    else -> consecutiveReadFailures = 0
                 }
 
                 // Apply dynamic preset selection to the DSP engine
@@ -500,8 +536,12 @@ class ChaosProjectionService : Service() {
                     System.arraycopy(buffer, 0, output, 0, read)
                 }
 
-                // Write to speaker
-                audioTrack?.write(output, 0, read, AudioTrack.WRITE_NON_BLOCKING)
+                // Write to speaker.
+                // Bug fix: WRITE_NON_BLOCKING silently drops data whenever the
+                // AudioTrack buffer is full, producing choppy/glitchy output
+                // under load. Use WRITE_BLOCKING so every processed frame is
+                // played out and the playback stream stays continuous.
+                audioTrack?.write(output, 0, read, AudioTrack.WRITE_BLOCKING)
 
             } catch (e: Exception) {
                 if (!running.get()) break

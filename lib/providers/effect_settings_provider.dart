@@ -22,8 +22,13 @@ class EffectSettingsNotifier extends StateNotifier<EffectSettings> {
   }
 
   /// Push current settings to the native audio service.
+  ///
+  /// Bug fix: the previous implementation forwarded only a narrow subset of
+  /// parameters, so most toggles and advanced controls in the UI never reached
+  /// the running native engine. All effect parameters are now forwarded.
   void _syncToNative(EffectSettings settings) {
     _bridge.updateParams(
+      // ── Core DSP ──
       gain: settings.gainBoost,
       crackleIntensity: settings.crackleIntensity,
       dropoutRate: settings.dropoutRate,
@@ -35,6 +40,30 @@ class EffectSettingsNotifier extends StateNotifier<EffectSettings> {
       echoDelay: settings.echoDelay,
       echoDecay: settings.echoDecay,
       pitchWobbleRange: settings.pitchWobbleRange,
+      // ── Effect toggle chain (native side honors enable flags) ──
+      masterEnabled: settings.masterEnabled,
+      gainEnabled: settings.gainEnabled,
+      echoEnabled: settings.echoEnabled,
+      reverbEnabled: settings.reverbEnabled,
+      crackleEnabled: settings.crackleEnabled,
+      dropoutEnabled: settings.dropoutEnabled,
+      fuzzEnabled: settings.fuzzEnabled,
+      bitCrushEnabled: settings.bitCrushEnabled,
+      pitchWobbleEnabled: settings.pitchWobbleEnabled,
+      radioFilterEnabled: settings.radioFilterEnabled,
+      clipEnabled: settings.clipEnabled,
+      // ── Advanced sections ──
+      chorusEnabled: settings.chorusEnabled,
+      chorusRate: settings.chorusRate,
+      chorusDepth: settings.chorusDepth,
+      chorusWetMix: settings.chorusWetMix,
+      eqBandGains: settings.eqBandGains,
+      convolutionReverbEnabled: settings.convolutionReverbEnabled,
+      convolutionReverbMix: settings.convolutionReverbMix,
+      formantShifterEnabled: settings.formantShifterEnabled,
+      formantShiftFactor: settings.formantShiftFactor,
+      formantShiftMix: settings.formantShiftMix,
+      lowPowerMode: settings.lowPowerMode,
     );
     AppLogger.info('[Provider] Settings synced to native');
   }

@@ -73,7 +73,18 @@ class MainActivity : AudioServiceActivity() {
                 }
                 "updateParams" -> {
                     val args = call.arguments as? Map<String, Any>
-                    if (args != null) VirtualMicService.applyParams(args)
+                    if (args != null) {
+                        // Normalize Flutter int (Long on Dart side) → Kotlin Int so the
+                        // native applyParams casts ((args["bitCrushDepth"] as? Int)) succeed;
+                        // otherwise int parameters were silently ignored and sliders had no effect.
+                        val normalized = args.mapValues { (_, v) ->
+                            when (v) {
+                                is Long -> v.toInt()
+                                else -> v
+                            }
+                        }
+                        VirtualMicService.applyParams(normalized)
+                    }
                     result.success(null)
                 }
                 "setRoutingMode" -> {
@@ -204,7 +215,15 @@ class MainActivity : AudioServiceActivity() {
                     result.success(true)
                 }
                 "isV3EngineRunning" -> {
-                    result.success(ChaosProjectionService.isRunning || VirtualMicService.isRunning)
+                    // Bug fix: previously this only checked the projection/mic
+                    // services and ignored the VPN survival service, so the
+                    // watchdog falsely reported the engine as stopped while
+                    // the VPN was still running.
+                    result.success(
+                        ChaosProjectionService.isRunning ||
+                        VirtualMicService.isRunning ||
+                        ChaosVpnService.isVpnRunning
+                    )
                 }
 
                 else -> result.notImplemented()

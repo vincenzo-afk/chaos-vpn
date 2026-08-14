@@ -36,6 +36,8 @@ class PitchWobble {
 
     // Gradually move current speed toward target (glide)
     _currentSpeed += (_targetSpeed - _currentSpeed) * 0.05;
+    // Clamp speed to avoid runaway slowdown/speedup artifacts
+    _currentSpeed = _currentSpeed.clamp(0.5, 2.0);
 
     _samplesUntilChange -= input.length;
     if (_samplesUntilChange <= 0) {
@@ -46,7 +48,9 @@ class PitchWobble {
     final allInput = [..._remainder, ...input];
     final output = <double>[];
 
-    while (_fractionalPos + 1 < allInput.length) {
+    // Bug fix: use `_fractionalPos + _currentSpeed <= allInput.length - 1`
+    // so the interpolation always has two valid neighbor samples.
+    while (_fractionalPos + _currentSpeed <= allInput.length - 1) {
       final i = _fractionalPos.floor();
       final frac = _fractionalPos - i;
       // Linear interpolation between adjacent samples
@@ -62,6 +66,16 @@ class PitchWobble {
       _remainder.addAll(allInput.sublist(consumed));
     }
     _fractionalPos -= consumed;
+
+    // Bug fix: if resampling produced no output yet (tiny chunk / very slow
+    // speed), emit one interpolated sample so downstream chunks never see an
+    // empty result, which caused audio dropouts at chunk boundaries.
+    if (output.isEmpty && allInput.length >= 2) {
+      final i = _fractionalPos.floor();
+      final frac = _fractionalPos - i;
+      output.add(allInput[i] * (1.0 - frac) + allInput[i + 1] * frac);
+      _fractionalPos += _currentSpeed;
+    }
 
     return output;
   }

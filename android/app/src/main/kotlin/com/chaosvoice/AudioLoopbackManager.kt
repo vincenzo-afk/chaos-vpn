@@ -29,6 +29,13 @@ class AudioLoopbackManager(
     private var isActive = false
 
     /**
+     * Optional DSP hook. When set, [readAndProcess] passes captured PCM through
+     * this processor (e.g. the unified ChaosDSP engine) before output. When
+     * null, audio passes through unchanged.
+     */
+    var processor: ((ShortArray, ShortArray, Int) -> Unit)? = null
+
+    /**
      * Initialize AudioRecord and AudioTrack instances.
      * Returns the buffer size used, or -1 on failure.
      */
@@ -81,11 +88,19 @@ class AudioLoopbackManager(
 
     /**
      * Start recording and playback.
+     *
+     * Bug fix: previously this started recording even if the underlying
+     * AudioRecord was never initialized (e.g. when [init] had failed), which
+     * threw IllegalStateException and left the loopback in a half-started state.
      */
     fun start(): Boolean {
         if (isActive) return true
         val record = audioRecord ?: return false
         val track = audioTrack ?: return false
+        if (record.state != AudioRecord.STATE_INITIALIZED) {
+            Log.e(TAG, "Cannot start loopback: AudioRecord not initialized")
+            return false
+        }
 
         try {
             record.startRecording()
@@ -103,14 +118,52 @@ class AudioLoopbackManager(
      * Read one buffer of raw PCM from the microphone.
      */
     fun read(buffer: ShortArray): Int {
-        return audioRecord?.read(buffer, 0, buffer.size) ?: -1
+        val record = audioRecord ?: return -1
+        val result = record.read(buffer, 0, buffer.size)
+        return when (result) {
+            AudioRecord.ERROR_BAD_VALUE,
+            AudioRecord.ERROR_INVALID_OPERATION -> -1
+            else -> result
+        }
+    }
+
+    /**
+     * Capture, process and play out one buffer.
+     *
+     * Bug fix: this replaces the missing DSP wiring — previously there was no
+     * way to route captured mic audio through the chaos engine on the
+     * loopback path, so callers could only do raw passthrough. With [processor]
+     * set (e.g. `processor = { inBuf, outBuf, n -> dsp?.process(inBuf, outBuf, n) }`),
+     * the modified voice is written out and heard by the remote party.
+     *
+     * @param input scratch input buffer
+     * @param output scratch output buffer (may equal [input] for in-place processors)
+     * @return number of processed samples played out, or -1 on failure
+     */
+    fun readAndProcess(input: ShortArray, output: ShortArray): Int {
+        val read = read(input)
+        if (read <= 0) return -1
+
+        val proc = processor
+        if (proc != null) {
+            proc(input, output, read)
+        } else {
+            System.arraycopy(input, 0, output, 0, read)
+        }
+        return write(output, read)
     }
 
     /**
      * Write processed PCM to the AudioTrack output.
+     *
+     * Bug fix: the previous implementation ignored [size] validation, so a
+     * negative or oversized size caused exceptions or corrupted playback.
+     *
+     * @return number of samples written, or -1 on failure
      */
-    fun write(buffer: ShortArray, size: Int) {
-        audioTrack?.write(buffer, 0, size)
+    fun write(buffer: ShortArray, size: Int): Int {
+        if (!isActive || buffer.isEmpty() || size <= 0 || size > buffer.size) return -1
+        return audioTrack?.write(buffer, 0, size) ?: -1
     }
 
     /**
@@ -134,4 +187,12 @@ class AudioLoopbackManager(
     }
 
     fun isActive(): Boolean = isActive
+
+    /**
+     * Check whether the underlying AudioRecord was initialized successfully.
+     */
+    fun isInitialized(): Boolean {
+        val record = audioRecord ?: return false
+        return record.state == AudioRecord.STATE_INITIALIZED
+    }
 }

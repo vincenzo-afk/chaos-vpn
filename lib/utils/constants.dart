@@ -14,7 +14,9 @@ class AudioConstants {
   static const int bufferSizeLarge = 640;   // 40ms at 16kHz
 
   // ─── DSP Thresholds ───
+  /// Max positive Int16 value (32767).
   static const double maxInt16 = 32767.0;
+  /// Min negative Int16 value (-32768).
   static const double maxInt16Neg = -32768.0;
   static const double defaultGain = 4.0;
   static const double defaultCrackleProb = 0.03;

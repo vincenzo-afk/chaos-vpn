@@ -262,6 +262,10 @@ class AudioEngineManager {
 
     func updateGain(_ gain: Float) {
         gainMultiplier = gain
+        // Bug fix: previously this only updated the stored value and never
+        // applied it, so changes to the volume slider had no audible effect
+        // once the engine had started.
+        outputMixer?.volume = gain
     }
 
     func updateReverb(_ wetDry: Float) {

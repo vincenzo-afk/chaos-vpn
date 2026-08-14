@@ -15,10 +15,21 @@ class PcmUtils {
   }
 
   /// Convert normalized doubles back to Int16List.
+  ///
+  /// Bug fix: the previous implementation rounded values near ±1.0 to 32768,
+  /// which overflows Int16 and wraps to -32768 on native conversion, causing
+  /// audible clicks/spikes at peak amplitude. Clamping the integer result
+  /// into the valid [-32768, 32767] range prevents this.
   static Int16List toInt16(List<double> samples) {
     final out = Int16List(samples.length);
     for (int i = 0; i < samples.length; i++) {
-      out[i] = (samples[i].clamp(-1.0, 1.0) * AudioConstants.maxInt16).round();
+      // Int16 valid range: -32768 .. 32767.
+      // Note: .clamp() with num bounds returns num, which cannot be assigned
+      // to Int16List; use explicit int bounds instead.
+      int v = (samples[i].clamp(-1.0, 1.0) * 32767.0).round().toInt();
+      if (v < -32768) v = -32768;
+      if (v > 32767) v = 32767;
+      out[i] = v;
     }
     return out;
   }

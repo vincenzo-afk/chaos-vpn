@@ -178,6 +178,17 @@ class VirtualMicService : Service() {
             Log.e(TAG, "AudioRecord failed: ${e.message}"); stopVirtualMic(); return
         }
 
+        // Bug fix: verify the record actually initialized; some devices return
+        // a non-null AudioRecord in STATE_UNINITIALIZED, which previously led
+        // to startRecording() throwing and the loop running with no input.
+        if (audioRecord?.state != AudioRecord.STATE_INITIALIZED) {
+            Log.e(TAG, "AudioRecord not initialized (state=${audioRecord?.state})")
+            audioRecord?.release()
+            audioRecord = null
+            stopVirtualMic()
+            return
+        }
+
         audioTrack = try {
             AudioTrack.Builder()
                 .setAudioAttributes(
@@ -284,9 +295,13 @@ class VirtualMicService : Service() {
                     System.arraycopy(buffer, 0, output, 0, read)
                 }
 
-                audioTrack?.write(output, 0, read, AudioTrack.WRITE_NON_BLOCKING)
+                // Bug fix: WRITE_NON_BLOCKING silently drops data when the
+                // AudioTrack buffer is full, producing choppy output under
+                // load. Use WRITE_BLOCKING for a continuous stream.
+                audioTrack?.write(output, 0, read, AudioTrack.WRITE_BLOCKING)
             } catch (e: Exception) {
                 if (!isRunningFlag.get()) break
+                Log.e(TAG, "Audio loop error: ${e.message}")
                 Thread.sleep(20)
             }
         }
