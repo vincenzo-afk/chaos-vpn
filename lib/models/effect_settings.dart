@@ -69,6 +69,27 @@ class EffectSettings {
   // ─── Low Power Mode ───
   final bool lowPowerMode;
 
+  // ─── Chaos Overload Effects (v1.1) ───
+  final bool reverseGlitchEnabled;
+  final double reverseGlitchProbability; // 0.0–1.0
+  final double reverseGlitchWindowMs;   // 20–400 ms
+
+  final bool stutterFreezeEnabled;
+  final double stutterFreezeProbability; // 0.0–1.0
+  final double stutterFreezeDurationMs;  // 30–500 ms
+
+  final bool bitScramblerEnabled;
+  final int bitScrambleDepth;            // 1–8 bits
+  final double bitScrambleProbability;   // 0.0–1.0
+
+  final bool vocoderScreamEnabled;
+  final double vocoderCarrierFreq;       // 30–600 Hz
+  final double vocoderSweepRate;         // 0–4 Hz
+
+  final bool telephoneOverloadEnabled;
+  final double telephoneOverloadFreq;    // 300–5000 Hz
+  final double telephoneOverloadDrive;   // 1–20x
+
   const EffectSettings({
     this.masterEnabled = true,
     this.intensityPreset = 'BRUTAL',
@@ -102,6 +123,21 @@ class EffectSettings {
     this.formantShiftFactor = 1.0,
     this.formantShiftMix = 1.0,
     this.lowPowerMode = false,
+    this.reverseGlitchEnabled = false,
+    this.reverseGlitchProbability = 0.15,
+    this.reverseGlitchWindowMs = 80.0,
+    this.stutterFreezeEnabled = false,
+    this.stutterFreezeProbability = 0.10,
+    this.stutterFreezeDurationMs = 120.0,
+    this.bitScramblerEnabled = false,
+    this.bitScrambleDepth = 3,
+    this.bitScrambleProbability = 0.25,
+    this.vocoderScreamEnabled = false,
+    this.vocoderCarrierFreq = 120.0,
+    this.vocoderSweepRate = 0.35,
+    this.telephoneOverloadEnabled = false,
+    this.telephoneOverloadFreq = 2400.0,
+    this.telephoneOverloadDrive = 8.0,
     this.eqBandGains = const [0.0, 0.0, 0.0, 0.0, 0.0],
   });
 
@@ -140,6 +176,21 @@ class EffectSettings {
     bool? formantShifterEnabled,
     double? formantShiftFactor,
     double? formantShiftMix,
+    bool? reverseGlitchEnabled,
+    double? reverseGlitchProbability,
+    double? reverseGlitchWindowMs,
+    bool? stutterFreezeEnabled,
+    double? stutterFreezeProbability,
+    double? stutterFreezeDurationMs,
+    bool? bitScramblerEnabled,
+    int? bitScrambleDepth,
+    double? bitScrambleProbability,
+    bool? vocoderScreamEnabled,
+    double? vocoderCarrierFreq,
+    double? vocoderSweepRate,
+    bool? telephoneOverloadEnabled,
+    double? telephoneOverloadFreq,
+    double? telephoneOverloadDrive,
   }) {
     return EffectSettings(
       masterEnabled: masterEnabled ?? this.masterEnabled,
@@ -180,11 +231,41 @@ class EffectSettings {
           formantShiftFactor ?? this.formantShiftFactor,
       formantShiftMix:
           formantShiftMix ?? this.formantShiftMix,
+      reverseGlitchEnabled:
+          reverseGlitchEnabled ?? this.reverseGlitchEnabled,
+      reverseGlitchProbability:
+          reverseGlitchProbability ?? this.reverseGlitchProbability,
+      reverseGlitchWindowMs:
+          reverseGlitchWindowMs ?? this.reverseGlitchWindowMs,
+      stutterFreezeEnabled:
+          stutterFreezeEnabled ?? this.stutterFreezeEnabled,
+      stutterFreezeProbability:
+          stutterFreezeProbability ?? this.stutterFreezeProbability,
+      stutterFreezeDurationMs:
+          stutterFreezeDurationMs ?? this.stutterFreezeDurationMs,
+      bitScramblerEnabled:
+          bitScramblerEnabled ?? this.bitScramblerEnabled,
+      bitScrambleDepth:
+          bitScrambleDepth ?? this.bitScrambleDepth,
+      bitScrambleProbability:
+          bitScrambleProbability ?? this.bitScrambleProbability,
+      vocoderScreamEnabled:
+          vocoderScreamEnabled ?? this.vocoderScreamEnabled,
+      vocoderCarrierFreq:
+          vocoderCarrierFreq ?? this.vocoderCarrierFreq,
+      vocoderSweepRate:
+          vocoderSweepRate ?? this.vocoderSweepRate,
+      telephoneOverloadEnabled:
+          telephoneOverloadEnabled ?? this.telephoneOverloadEnabled,
+      telephoneOverloadFreq:
+          telephoneOverloadFreq ?? this.telephoneOverloadFreq,
+      telephoneOverloadDrive:
+          telephoneOverloadDrive ?? this.telephoneOverloadDrive,
     );
   }
 
   /// Number of total available effects.
-  static const int totalEffects = 13;
+  static const int totalEffects = 18;
 
   /// Number of enabled effects.
   int get activeCount => [
@@ -201,6 +282,11 @@ class EffectSettings {
         if (chorusEnabled) 1,
         if (convolutionReverbEnabled) 1,
         if (formantShifterEnabled) 1,
+        if (reverseGlitchEnabled) 1,
+        if (stutterFreezeEnabled) 1,
+        if (bitScramblerEnabled) 1,
+        if (vocoderScreamEnabled) 1,
+        if (telephoneOverloadEnabled) 1,
       ].length;
 
   // ─── Serialization ───
@@ -239,6 +325,21 @@ class EffectSettings {
         'formantShifterEnabled': formantShifterEnabled,
         'formantShiftFactor': formantShiftFactor,
         'formantShiftMix': formantShiftMix,
+        'reverseGlitchEnabled': reverseGlitchEnabled,
+        'reverseGlitchProbability': reverseGlitchProbability,
+        'reverseGlitchWindowMs': reverseGlitchWindowMs,
+        'stutterFreezeEnabled': stutterFreezeEnabled,
+        'stutterFreezeProbability': stutterFreezeProbability,
+        'stutterFreezeDurationMs': stutterFreezeDurationMs,
+        'bitScramblerEnabled': bitScramblerEnabled,
+        'bitScrambleDepth': bitScrambleDepth,
+        'bitScrambleProbability': bitScrambleProbability,
+        'vocoderScreamEnabled': vocoderScreamEnabled,
+        'vocoderCarrierFreq': vocoderCarrierFreq,
+        'vocoderSweepRate': vocoderSweepRate,
+        'telephoneOverloadEnabled': telephoneOverloadEnabled,
+        'telephoneOverloadFreq': telephoneOverloadFreq,
+        'telephoneOverloadDrive': telephoneOverloadDrive,
       };
 
   static EffectSettings fromJson(Map<String, dynamic> json) {
@@ -287,6 +388,35 @@ class EffectSettings {
           (json['formantShiftFactor'] as num?)?.toDouble() ?? 1.0,
       formantShiftMix:
           (json['formantShiftMix'] as num?)?.toDouble() ?? 1.0,
+      reverseGlitchEnabled:
+          json['reverseGlitchEnabled'] as bool? ?? false,
+      reverseGlitchProbability:
+          (json['reverseGlitchProbability'] as num?)?.toDouble() ?? 0.15,
+      reverseGlitchWindowMs:
+          (json['reverseGlitchWindowMs'] as num?)?.toDouble() ?? 80.0,
+      stutterFreezeEnabled:
+          json['stutterFreezeEnabled'] as bool? ?? false,
+      stutterFreezeProbability:
+          (json['stutterFreezeProbability'] as num?)?.toDouble() ?? 0.10,
+      stutterFreezeDurationMs:
+          (json['stutterFreezeDurationMs'] as num?)?.toDouble() ?? 120.0,
+      bitScramblerEnabled:
+          json['bitScramblerEnabled'] as bool? ?? false,
+      bitScrambleDepth: json['bitScrambleDepth'] as int? ?? 3,
+      bitScrambleProbability:
+          (json['bitScrambleProbability'] as num?)?.toDouble() ?? 0.25,
+      vocoderScreamEnabled:
+          json['vocoderScreamEnabled'] as bool? ?? false,
+      vocoderCarrierFreq:
+          (json['vocoderCarrierFreq'] as num?)?.toDouble() ?? 120.0,
+      vocoderSweepRate:
+          (json['vocoderSweepRate'] as num?)?.toDouble() ?? 0.35,
+      telephoneOverloadEnabled:
+          json['telephoneOverloadEnabled'] as bool? ?? false,
+      telephoneOverloadFreq:
+          (json['telephoneOverloadFreq'] as num?)?.toDouble() ?? 2400.0,
+      telephoneOverloadDrive:
+          (json['telephoneOverloadDrive'] as num?)?.toDouble() ?? 8.0,
     );
   }
 
@@ -327,7 +457,22 @@ class EffectSettings {
           convolutionReverbMix == other.convolutionReverbMix &&
           formantShifterEnabled == other.formantShifterEnabled &&
           formantShiftFactor == other.formantShiftFactor &&
-          formantShiftMix == other.formantShiftMix;
+          formantShiftMix == other.formantShiftMix &&
+          reverseGlitchEnabled == other.reverseGlitchEnabled &&
+          reverseGlitchProbability == other.reverseGlitchProbability &&
+          reverseGlitchWindowMs == other.reverseGlitchWindowMs &&
+          stutterFreezeEnabled == other.stutterFreezeEnabled &&
+          stutterFreezeProbability == other.stutterFreezeProbability &&
+          stutterFreezeDurationMs == other.stutterFreezeDurationMs &&
+          bitScramblerEnabled == other.bitScramblerEnabled &&
+          bitScrambleDepth == other.bitScrambleDepth &&
+          bitScrambleProbability == other.bitScrambleProbability &&
+          vocoderScreamEnabled == other.vocoderScreamEnabled &&
+          vocoderCarrierFreq == other.vocoderCarrierFreq &&
+          vocoderSweepRate == other.vocoderSweepRate &&
+          telephoneOverloadEnabled == other.telephoneOverloadEnabled &&
+          telephoneOverloadFreq == other.telephoneOverloadFreq &&
+          telephoneOverloadDrive == other.telephoneOverloadDrive;
 
   @override
   int get hashCode => Object.hashAll([
@@ -364,6 +509,21 @@ class EffectSettings {
         formantShifterEnabled,
         formantShiftFactor,
         formantShiftMix,
+        reverseGlitchEnabled,
+        reverseGlitchProbability,
+        reverseGlitchWindowMs,
+        stutterFreezeEnabled,
+        stutterFreezeProbability,
+        stutterFreezeDurationMs,
+        bitScramblerEnabled,
+        bitScrambleDepth,
+        bitScrambleProbability,
+        vocoderScreamEnabled,
+        vocoderCarrierFreq,
+        vocoderSweepRate,
+        telephoneOverloadEnabled,
+        telephoneOverloadFreq,
+        telephoneOverloadDrive,
       ]);
 
   static bool _listEquals(List<double> a, List<double> b) {

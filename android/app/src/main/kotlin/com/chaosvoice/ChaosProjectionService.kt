@@ -133,6 +133,41 @@ class ChaosProjectionService : Service() {
             intensityPreset     = (args["intensityPreset"] as? String)              ?: intensityPreset
             Log.d(TAG, "DSP params updated: gain=$gainFactor, bits=$bitCrushDepth, ringMod=$ringModFreq Hz, preset=$intensityPreset")
         }
+
+        /**
+         * Apply Chaos Overload (v1.1) effect parameters to the running DSP
+         * instance, creating it lazily so the effects are honored on the live
+         * engine rather than only on future instances.
+         */
+        private var liveDsp: ChaosDSP? = null
+
+        fun bindLiveDsp(d: ChaosDSP?) { liveDsp = d }
+
+        fun applyChaosOverloadParams(args: Map<String, Any>) {
+            val dsp = liveDsp ?: return
+            dsp.reverseEnabled        = args["reverseGlitchEnabled"] as? Boolean        ?: dsp.reverseEnabled
+            dsp.reverseProbability    = (args["reverseGlitchProbability"] as? Double)?.toFloat()   ?: dsp.reverseProbability
+            // Flutter→Kotlin already normalizes Long→Int, so the ms values arrive as Int.
+            // Convert to samples at 48kHz with a sanity clamp.
+            if (args["reverseGlitchWindowMs"] is Int) {
+                dsp.reverseWindowSamples = (args["reverseGlitchWindowMs"] as Int * SAMPLE_RATE / 1000).coerceIn(64, 4800)
+            }
+            dsp.freezeEnabled         = args["stutterFreezeEnabled"] as? Boolean          ?: dsp.freezeEnabled
+            dsp.freezeProbability     = (args["stutterFreezeProbability"] as? Double)?.toFloat()     ?: dsp.freezeProbability
+            if (args["stutterFreezeDurationMs"] is Int) {
+                dsp.freezeDurationSamples = (args["stutterFreezeDurationMs"] as Int * SAMPLE_RATE / 1000).coerceIn(48, 24000)
+            }
+            dsp.bitScrambleEnabled    = args["bitScramblerEnabled"] as? Boolean           ?: dsp.bitScrambleEnabled
+            dsp.bitScrambleDepth      = (args["bitScrambleDepth"] as? Number)?.toInt()    ?: dsp.bitScrambleDepth
+            dsp.bitScrambleProbability= (args["bitScrambleProbability"] as? Double)?.toFloat()       ?: dsp.bitScrambleProbability
+            dsp.vocoderEnabled        = args["vocoderScreamEnabled"] as? Boolean          ?: dsp.vocoderEnabled
+            dsp.vocoderCarrierHz      = (args["vocoderCarrierFreq"] as? Double)?.toFloat()          ?: dsp.vocoderCarrierHz
+            dsp.vocoderSweepRateHz    = (args["vocoderSweepRate"] as? Double)?.toFloat()            ?: dsp.vocoderSweepRateHz
+            dsp.telephoneEnabled      = args["telephoneOverloadEnabled"] as? Boolean      ?: dsp.telephoneEnabled
+            dsp.telephoneFreqHz       = (args["telephoneOverloadFreq"] as? Double)?.toFloat()       ?: dsp.telephoneFreqHz
+            dsp.telephoneDrive        = (args["telephoneOverloadDrive"] as? Double)?.toFloat()      ?: dsp.telephoneDrive
+            Log.d(TAG, "Chaos Overload params applied (live DSP)")
+        }
     }
 
     private val running = AtomicBoolean(false)
@@ -272,6 +307,8 @@ class ChaosProjectionService : Service() {
         // Initialize stateful ChaosDSP engine
         dsp = ChaosDSP(SAMPLE_RATE.toFloat()).apply {
             reset()
+            // Bind to the companion so live param updates reach this engine
+            ChaosProjectionService.bindLiveDsp(this)
         }
 
         // Set audio manager to communication mode for max priority

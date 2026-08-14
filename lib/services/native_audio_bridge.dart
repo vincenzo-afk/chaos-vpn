@@ -88,6 +88,22 @@ class NativeAudioBridge {
     double formantShiftFactor = 1.0,
     double formantShiftMix = 1.0,
     bool lowPowerMode = false,
+    // ── Chaos Overload effects (v1.1) ──
+    bool reverseGlitchEnabled = false,
+    double reverseGlitchProbability = 0.15,
+    double reverseGlitchWindowMs = 80.0,
+    bool stutterFreezeEnabled = false,
+    double stutterFreezeProbability = 0.10,
+    double stutterFreezeDurationMs = 120.0,
+    bool bitScramblerEnabled = false,
+    int bitScrambleDepth = 3,
+    double bitScrambleProbability = 0.25,
+    bool vocoderScreamEnabled = false,
+    double vocoderCarrierFreq = 120.0,
+    double vocoderSweepRate = 0.35,
+    bool telephoneOverloadEnabled = false,
+    double telephoneOverloadFreq = 2400.0,
+    double telephoneOverloadDrive = 8.0,
   }) async {
     try {
       await _channel.invokeMethod(ChannelMethods.updateParams, {
@@ -131,6 +147,22 @@ class NativeAudioBridge {
         'formantShiftFactor': formantShiftFactor,
         'formantShiftMix': formantShiftMix,
         'lowPowerMode': lowPowerMode,
+        // ── Chaos Overload effects (v1.1) ──
+        'reverseGlitchEnabled': reverseGlitchEnabled,
+        'reverseGlitchProbability': reverseGlitchProbability,
+        'reverseGlitchWindowMs': reverseGlitchWindowMs,
+        'stutterFreezeEnabled': stutterFreezeEnabled,
+        'stutterFreezeProbability': stutterFreezeProbability,
+        'stutterFreezeDurationMs': stutterFreezeDurationMs,
+        'bitScramblerEnabled': bitScramblerEnabled,
+        'bitScrambleDepth': bitScrambleDepth,
+        'bitScrambleProbability': bitScrambleProbability,
+        'vocoderScreamEnabled': vocoderScreamEnabled,
+        'vocoderCarrierFreq': vocoderCarrierFreq,
+        'vocoderSweepRate': vocoderSweepRate,
+        'telephoneOverloadEnabled': telephoneOverloadEnabled,
+        'telephoneOverloadFreq': telephoneOverloadFreq,
+        'telephoneOverloadDrive': telephoneOverloadDrive,
       });
     } on PlatformException catch (e) {
       AppLogger.error('updateParams failed: ${e.message}');

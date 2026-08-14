@@ -9,6 +9,11 @@ import 'graphic_eq.dart';
 import 'chorus_flanger.dart';
 import 'convolution_reverb.dart';
 import 'formant_shifter.dart';
+import 'vocoder_scream.dart';
+import 'telephone_overload.dart';
+import 'reverse_glitch.dart';
+import 'stutter_freezer.dart';
+import 'bit_scrambler.dart';
 import '../models/effect_settings.dart';
 import '../utils/constants.dart';
 
@@ -67,6 +72,11 @@ class EffectEngine {
   late final ChorusFlanger _chorus;
   late final ConvolutionReverb _convolutionReverb;
   late final FormantShifter _formantShifter;
+  late final VocoderScream _vocoderScream;
+  late final TelephoneOverload _telephoneOverload;
+  late final ReverseGlitch _reverseGlitch;
+  late final StutterFreezer _stutterFreezer;
+  late final BitScrambler _bitScrambler;
 
   // Processing statistics
   int totalChunksProcessed = 0;
@@ -88,6 +98,11 @@ class EffectEngine {
     _chorus = ChorusFlanger(sampleRate: sampleRate);
     _convolutionReverb = ConvolutionReverb(sampleRate: sampleRate);
     _formantShifter = FormantShifter(sampleRate: sampleRate);
+    _vocoderScream = VocoderScream(sampleRate: sampleRate);
+    _telephoneOverload = TelephoneOverload(sampleRate: sampleRate);
+    _reverseGlitch = ReverseGlitch(sampleRate: sampleRate);
+    _stutterFreezer = StutterFreezer(sampleRate: sampleRate);
+    _bitScrambler = BitScrambler(sampleRate: sampleRate);
   }
 
   /// Update all effect parameters from a settings object.
@@ -133,6 +148,27 @@ class EffectEngine {
     _formantShifter.enabled = settings.formantShifterEnabled;
     _formantShifter.shiftFactor = settings.formantShiftFactor;
     _formantShifter.mix = settings.formantShiftMix;
+
+    // Chaos Overload effects (v1.1) — five destructive stages
+    _vocoderScream.enabled = settings.vocoderScreamEnabled;
+    _vocoderScream.carrierFrequency = settings.vocoderCarrierFreq;
+    _vocoderScream.sweepRate = settings.vocoderSweepRate;
+
+    _telephoneOverload.enabled = settings.telephoneOverloadEnabled;
+    _telephoneOverload.centerFrequency = settings.telephoneOverloadFreq;
+    _telephoneOverload.drive = settings.telephoneOverloadDrive;
+
+    _reverseGlitch.enabled = settings.reverseGlitchEnabled;
+    _reverseGlitch.reversalProbability = settings.reverseGlitchProbability;
+    _reverseGlitch.windowLengthMs = settings.reverseGlitchWindowMs;
+
+    _stutterFreezer.enabled = settings.stutterFreezeEnabled;
+    _stutterFreezer.freezeProbability = settings.stutterFreezeProbability;
+    _stutterFreezer.freezeDurationMs = settings.stutterFreezeDurationMs;
+
+    _bitScrambler.enabled = settings.bitScramblerEnabled;
+    _bitScrambler.scrambleDepth = settings.bitScrambleDepth;
+    _bitScrambler.scrambleProbability = settings.bitScrambleProbability;
 
     // Low power mode overrides: disable reverb + pitch (most CPU-heavy)
     if (lowPowerMode) {
@@ -219,7 +255,22 @@ class EffectEngine {
       _formantShifter.process(samples);
     }
 
-    // ────── Stage 10: Pitch Wobble (randomized resampling) ──────
+    // ────── Stage 11: Vocoder Scream (harmonically-rich ring modulation) ──────
+    if (_vocoderScream.enabled) _vocoderScream.process(samples);
+
+    // ────── Stage 12: Telephone Overload (resonant crunch) ──────
+    if (_telephoneOverload.enabled) _telephoneOverload.process(samples);
+
+    // ────── Stage 13: Reverse Glitch (tape-reverse fragments) ──────
+    if (_reverseGlitch.enabled) _reverseGlitch.process(samples);
+
+    // ────── Stage 14: Stutter Freeze (broken-record repeats) ──────
+    if (_stutterFreezer.enabled) _stutterFreezer.process(samples);
+
+    // ────── Stage 15: Bit Scrambler (raw data corruption) ──────
+    if (_bitScrambler.enabled) _bitScrambler.process(samples);
+
+    // ────── Stage 10b: Pitch Wobble (randomized resampling) ──────
     if (pitchWobbleEnabled) {
       _pitch.range = pitchWobbleRange;
       final wobbled = _pitch.process(samples);
@@ -245,6 +296,21 @@ class EffectEngine {
 
   /// Access the FormantShifter module.
   FormantShifter get formantShifter => _formantShifter;
+
+  /// Access the VocoderScream module.
+  VocoderScream get vocoderScream => _vocoderScream;
+
+  /// Access the TelephoneOverload module.
+  TelephoneOverload get telephoneOverload => _telephoneOverload;
+
+  /// Access the ReverseGlitch module.
+  ReverseGlitch get reverseGlitch => _reverseGlitch;
+
+  /// Access the StutterFreezer module.
+  StutterFreezer get stutterFreezer => _stutterFreezer;
+
+  /// Access the BitScrambler module.
+  BitScrambler get bitScrambler => _bitScrambler;
 
   // ═══════════════════════════ Effect 1: Gain Boost ═══════════════════════════
   void _applyGainBoost(List<double> samples) {
@@ -350,6 +416,11 @@ class EffectEngine {
     _chorus.reset();
     _convolutionReverb.reset();
     _formantShifter.reset();
+    _vocoderScream.reset();
+    _telephoneOverload.reset();
+    _reverseGlitch.reset();
+    _stutterFreezer.reset();
+    _bitScrambler.reset();
     _echoPreWarmed = false;
     totalChunksProcessed = 0;
     totalSamplesProcessed = 0;
@@ -363,5 +434,10 @@ class EffectEngine {
     _chorus.dispose();
     _convolutionReverb.dispose();
     _formantShifter.dispose();
+    _vocoderScream.dispose();
+    _telephoneOverload.dispose();
+    _reverseGlitch.dispose();
+    _stutterFreezer.dispose();
+    _bitScrambler.dispose();
   }
 }

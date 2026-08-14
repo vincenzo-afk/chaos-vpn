@@ -64,6 +64,22 @@ class EffectSettingsNotifier extends StateNotifier<EffectSettings> {
       formantShiftFactor: settings.formantShiftFactor,
       formantShiftMix: settings.formantShiftMix,
       lowPowerMode: settings.lowPowerMode,
+      // ── Chaos Overload effects (v1.1) ──
+      reverseGlitchEnabled: settings.reverseGlitchEnabled,
+      reverseGlitchProbability: settings.reverseGlitchProbability,
+      reverseGlitchWindowMs: settings.reverseGlitchWindowMs,
+      stutterFreezeEnabled: settings.stutterFreezeEnabled,
+      stutterFreezeProbability: settings.stutterFreezeProbability,
+      stutterFreezeDurationMs: settings.stutterFreezeDurationMs,
+      bitScramblerEnabled: settings.bitScramblerEnabled,
+      bitScrambleDepth: settings.bitScrambleDepth,
+      bitScrambleProbability: settings.bitScrambleProbability,
+      vocoderScreamEnabled: settings.vocoderScreamEnabled,
+      vocoderCarrierFreq: settings.vocoderCarrierFreq,
+      vocoderSweepRate: settings.vocoderSweepRate,
+      telephoneOverloadEnabled: settings.telephoneOverloadEnabled,
+      telephoneOverloadFreq: settings.telephoneOverloadFreq,
+      telephoneOverloadDrive: settings.telephoneOverloadDrive,
     );
     AppLogger.info('[Provider] Settings synced to native');
   }

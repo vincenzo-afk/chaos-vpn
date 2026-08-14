@@ -36,6 +36,22 @@ class Preset {
   final bool formantShifterEnabled;
   final double formantShiftFactor;
   final double formantShiftMix;
+  // ── Chaos Overload Effects (v1.1) ──
+  final bool reverseGlitchEnabled;
+  final double reverseGlitchProbability;
+  final double reverseGlitchWindowMs;
+  final bool stutterFreezeEnabled;
+  final double stutterFreezeProbability;
+  final double stutterFreezeDurationMs;
+  final bool bitScramblerEnabled;
+  final int bitScrambleDepth;
+  final double bitScrambleProbability;
+  final bool vocoderScreamEnabled;
+  final double vocoderCarrierFreq;
+  final double vocoderSweepRate;
+  final bool telephoneOverloadEnabled;
+  final double telephoneOverloadFreq;
+  final double telephoneOverloadDrive;
 
   const Preset({
     required this.name,
@@ -70,6 +86,21 @@ class Preset {
     this.formantShifterEnabled = false,
     this.formantShiftFactor = 1.0,
     this.formantShiftMix = 1.0,
+    this.reverseGlitchEnabled = false,
+    this.reverseGlitchProbability = 0.15,
+    this.reverseGlitchWindowMs = 80.0,
+    this.stutterFreezeEnabled = false,
+    this.stutterFreezeProbability = 0.10,
+    this.stutterFreezeDurationMs = 120.0,
+    this.bitScramblerEnabled = false,
+    this.bitScrambleDepth = 3,
+    this.bitScrambleProbability = 0.25,
+    this.vocoderScreamEnabled = false,
+    this.vocoderCarrierFreq = 120.0,
+    this.vocoderSweepRate = 0.35,
+    this.telephoneOverloadEnabled = false,
+    this.telephoneOverloadFreq = 2400.0,
+    this.telephoneOverloadDrive = 8.0,
   });
 
   Map<String, dynamic> toJson() => {
@@ -105,6 +136,21 @@ class Preset {
     'formantShifterEnabled': formantShifterEnabled,
     'formantShiftFactor': formantShiftFactor,
     'formantShiftMix': formantShiftMix,
+    'reverseGlitchEnabled': reverseGlitchEnabled,
+    'reverseGlitchProbability': reverseGlitchProbability,
+    'reverseGlitchWindowMs': reverseGlitchWindowMs,
+    'stutterFreezeEnabled': stutterFreezeEnabled,
+    'stutterFreezeProbability': stutterFreezeProbability,
+    'stutterFreezeDurationMs': stutterFreezeDurationMs,
+    'bitScramblerEnabled': bitScramblerEnabled,
+    'bitScrambleDepth': bitScrambleDepth,
+    'bitScrambleProbability': bitScrambleProbability,
+    'vocoderScreamEnabled': vocoderScreamEnabled,
+    'vocoderCarrierFreq': vocoderCarrierFreq,
+    'vocoderSweepRate': vocoderSweepRate,
+    'telephoneOverloadEnabled': telephoneOverloadEnabled,
+    'telephoneOverloadFreq': telephoneOverloadFreq,
+    'telephoneOverloadDrive': telephoneOverloadDrive,
       };
 
   factory Preset.fromJson(Map<String, dynamic> json) => Preset(
@@ -151,6 +197,35 @@ class Preset {
             (json['formantShiftFactor'] as num?)?.toDouble() ?? 1.0,
         formantShiftMix:
             (json['formantShiftMix'] as num?)?.toDouble() ?? 1.0,
+        reverseGlitchEnabled:
+            json['reverseGlitchEnabled'] as bool? ?? false,
+        reverseGlitchProbability:
+            (json['reverseGlitchProbability'] as num?)?.toDouble() ?? 0.15,
+        reverseGlitchWindowMs:
+            (json['reverseGlitchWindowMs'] as num?)?.toDouble() ?? 80.0,
+        stutterFreezeEnabled:
+            json['stutterFreezeEnabled'] as bool? ?? false,
+        stutterFreezeProbability:
+            (json['stutterFreezeProbability'] as num?)?.toDouble() ?? 0.10,
+        stutterFreezeDurationMs:
+            (json['stutterFreezeDurationMs'] as num?)?.toDouble() ?? 120.0,
+        bitScramblerEnabled:
+            json['bitScramblerEnabled'] as bool? ?? false,
+        bitScrambleDepth: json['bitScrambleDepth'] as int? ?? 3,
+        bitScrambleProbability:
+            (json['bitScrambleProbability'] as num?)?.toDouble() ?? 0.25,
+        vocoderScreamEnabled:
+            json['vocoderScreamEnabled'] as bool? ?? false,
+        vocoderCarrierFreq:
+            (json['vocoderCarrierFreq'] as num?)?.toDouble() ?? 120.0,
+        vocoderSweepRate:
+            (json['vocoderSweepRate'] as num?)?.toDouble() ?? 0.35,
+        telephoneOverloadEnabled:
+            json['telephoneOverloadEnabled'] as bool? ?? false,
+        telephoneOverloadFreq:
+            (json['telephoneOverloadFreq'] as num?)?.toDouble() ?? 2400.0,
+        telephoneOverloadDrive:
+            (json['telephoneOverloadDrive'] as num?)?.toDouble() ?? 8.0,
       );
 
   @override
@@ -189,7 +264,22 @@ class Preset {
           convolutionReverbMix == other.convolutionReverbMix &&
           formantShifterEnabled == other.formantShifterEnabled &&
           formantShiftFactor == other.formantShiftFactor &&
-          formantShiftMix == other.formantShiftMix;
+          formantShiftMix == other.formantShiftMix &&
+          reverseGlitchEnabled == other.reverseGlitchEnabled &&
+          reverseGlitchProbability == other.reverseGlitchProbability &&
+          reverseGlitchWindowMs == other.reverseGlitchWindowMs &&
+          stutterFreezeEnabled == other.stutterFreezeEnabled &&
+          stutterFreezeProbability == other.stutterFreezeProbability &&
+          stutterFreezeDurationMs == other.stutterFreezeDurationMs &&
+          bitScramblerEnabled == other.bitScramblerEnabled &&
+          bitScrambleDepth == other.bitScrambleDepth &&
+          bitScrambleProbability == other.bitScrambleProbability &&
+          vocoderScreamEnabled == other.vocoderScreamEnabled &&
+          vocoderCarrierFreq == other.vocoderCarrierFreq &&
+          vocoderSweepRate == other.vocoderSweepRate &&
+          telephoneOverloadEnabled == other.telephoneOverloadEnabled &&
+          telephoneOverloadFreq == other.telephoneOverloadFreq &&
+          telephoneOverloadDrive == other.telephoneOverloadDrive;
 
   @override
   int get hashCode => Object.hashAll([
@@ -225,6 +315,21 @@ class Preset {
         formantShifterEnabled,
         formantShiftFactor,
         formantShiftMix,
+        reverseGlitchEnabled,
+        reverseGlitchProbability,
+        reverseGlitchWindowMs,
+        stutterFreezeEnabled,
+        stutterFreezeProbability,
+        stutterFreezeDurationMs,
+        bitScramblerEnabled,
+        bitScrambleDepth,
+        bitScrambleProbability,
+        vocoderScreamEnabled,
+        vocoderCarrierFreq,
+        vocoderSweepRate,
+        telephoneOverloadEnabled,
+        telephoneOverloadFreq,
+        telephoneOverloadDrive,
       ]);
 
   static bool _listEquals(List<double> a, List<double> b) {
@@ -316,6 +421,60 @@ class Preset {
       pitchWobbleRange: 1.0,
       radioFilterEnabled: false,
       clipThreshold: 0.7,
+    ),
+    // ── Chaos Overload: Broken Transmission ──
+    Preset(
+      name: 'Broken Transmission',
+      description: 'Glitchy — tape reversals + stutter freezes + bit corruption',
+      reverseGlitchEnabled: true,
+      reverseGlitchProbability: 0.25,
+      reverseGlitchWindowMs: 120.0,
+      stutterFreezeEnabled: true,
+      stutterFreezeProbability: 0.15,
+      stutterFreezeDurationMs: 100.0,
+      bitScramblerEnabled: true,
+      bitScrambleDepth: 3,
+      bitScrambleProbability: 0.20,
+      bitCrushDepth: 5,
+      dropoutRate: 0.05,
+    ),
+    // ── Chaos Overload: Demon Radio ──
+    Preset(
+      name: 'Demon Radio',
+      description: 'Overloaded radio crunch — resonant telephone band + vocoder scream',
+      telephoneOverloadEnabled: true,
+      telephoneOverloadFreq: 2800.0,
+      telephoneOverloadDrive: 12.0,
+      vocoderScreamEnabled: true,
+      vocoderCarrierFreq: 90.0,
+      vocoderSweepRate: 0.8,
+      fuzzDrive: 6.0,
+      gainBoost: 5.0,
+      radioFilterEnabled: true,
+      echoEnabled: false,
+      reverbEnabled: false,
+    ),
+    // ── Chaos Overload: Total Corruption ──
+    Preset(
+      name: 'Total Corruption',
+      description: 'Maximum destruction — all five chaos overload stages active',
+      reverseGlitchEnabled: true,
+      reverseGlitchProbability: 0.18,
+      reverseGlitchWindowMs: 90.0,
+      stutterFreezeEnabled: true,
+      stutterFreezeProbability: 0.12,
+      stutterFreezeDurationMs: 150.0,
+      bitScramblerEnabled: true,
+      bitScrambleDepth: 4,
+      bitScrambleProbability: 0.30,
+      vocoderScreamEnabled: true,
+      vocoderCarrierFreq: 150.0,
+      vocoderSweepRate: 1.2,
+      telephoneOverloadEnabled: true,
+      telephoneOverloadFreq: 3200.0,
+      telephoneOverloadDrive: 10.0,
+      gainBoost: 5.0,
+      bitCrushDepth: 4,
     ),
   ];
 }

@@ -60,6 +60,33 @@ class ChaosDSP(private val sampleRate: Float = 48000f) {
     // Downsampling state
     private var lastHeldSample = 0f
 
+    // ─── Chaos Overload stages (v1.1) — manual override parameters ──────────
+    @Volatile var reverseEnabled = false
+    @Volatile var reverseProbability = 0.0f
+    @Volatile var reverseWindowSamples = 1920   // default ~40ms at 48k
+    @Volatile var freezeEnabled = false
+    @Volatile var freezeProbability = 0.0f
+    @Volatile var freezeDurationSamples = 2880  // default ~60ms at 48k
+    @Volatile var bitScrambleEnabled = false
+    @Volatile var bitScrambleDepth = 0          // number of bit positions corrupted
+    @Volatile var bitScrambleProbability = 0.0f
+    @Volatile var vocoderEnabled = false
+    @Volatile var vocoderCarrierHz = 0f         // 0 = use ringModOverride fallback
+    @Volatile var vocoderSweepRateHz = 0f
+    @Volatile var telephoneEnabled = false
+    @Volatile var telephoneFreqHz = 2400f
+    @Volatile var telephoneDrive = 0f
+
+    // Post-limiter processing state
+    private val telephoneBiquad = BiquadFilter()
+    private var reverseRing = FloatArray(4800)    // max 100ms at 48kHz
+    private var reverseWrite = 0
+    private var reverseReadBase = 0
+    private var freezeHeldSample = 0f
+    private var freezeCounter = 0
+    private var vocoderPhase = 0.0
+    private var vocoderSweepPhase = 0.0
+
     // ─── Biquad Filter Helper Class ───────────────────────────────────────────
     class BiquadFilter {
         private var x1 = 0f
@@ -166,6 +193,14 @@ class ChaosDSP(private val sampleRate: Float = 48000f) {
         glitchFrozen = false
         glitchCounter = 0
         lastHeldSample = 0f
+        telephoneBiquad.reset()
+        reverseRing.fill(0f)
+        reverseWrite = 0
+        reverseReadBase = 0
+        freezeHeldSample = 0f
+        freezeCounter = 0
+        vocoderPhase = 0.0
+        vocoderSweepPhase = 0.0
     }
 
     /**
@@ -398,8 +433,67 @@ class ChaosDSP(private val sampleRate: Float = 48000f) {
             // Save to buffer for stuttering repeats
             glitchBuffer[i % glitchBuffer.size] = s
 
-            // Stage 10: Convert back to PCM16 Short and save to output buffer
-            output[i] = (s * 32767.0f).toInt().toShort()
+            // ── Stage 9b: Telephone Overload (resonant crunch band) ──
+            if (telephoneEnabled && telephoneDrive > 0f) {
+                telephoneBiquad.setBandpass(sampleRate, telephoneFreqHz, 6.0f)
+                s = telephoneBiquad.process(s) * (1.0f + telephoneDrive * 0.25f)
+                s = fastTanh(s)
+                s = s.coerceIn(-1.0f, 1.0f)
+            }
+
+            // ── Stage 9c: Vocoder Scream (saturate-first ring modulation with sweep) ──
+            if (vocoderEnabled) {
+                val sweep = 1.0f + 0.4f * sin(vocoderSweepPhase).toFloat()
+                vocoderSweepPhase += (2.0 * Math.PI * vocoderSweepRateHz / sampleRate).toFloat()
+                if (vocoderSweepPhase >= 2.0f * Math.PI.toFloat()) vocoderSweepPhase -= 2.0f * Math.PI.toFloat()
+                val carrierHz = (vocoderCarrierHz.takeIf { it > 0f } ?: (ringModOverride ?: 120f)) * sweep
+                val carrierInc = 2.0 * Math.PI * carrierHz / sampleRate
+                val carrier = sin(vocoderPhase).toFloat()
+                vocoderPhase += carrierInc
+                if (vocoderPhase >= 2.0 * Math.PI) vocoderPhase -= 2.0 * Math.PI
+                s = fastTanh(s * 2.5f) * carrier
+                s = s.coerceIn(-1.0f, 1.0f)
+            }
+
+            // ── Stage 9d: Reverse Glitch (tape-reverse fragments via ring buffer) ──
+            if (reverseEnabled && reverseProbability > 0f) {
+                reverseRing[reverseWrite] = s
+                reverseWrite = (reverseWrite + 1) % reverseRing.size
+                if (rng.nextFloat() < reverseProbability) {
+                    reverseReadBase = (reverseWrite - reverseWindowSamples + reverseRing.size) % reverseRing.size
+                }
+                val windowSamples = reverseWindowSamples.coerceIn(64, reverseRing.size)
+                val readRev = (reverseReadBase - (i % windowSamples) + reverseRing.size) % reverseRing.size
+                // Cross-blend reverse fragment: play reversed audio at full strength during glitch
+                s = reverseRing[readRev]
+            }
+
+            // ── Stage 9e: Stutter Freeze (broken-record repeat lock) ──
+            if (freezeEnabled && freezeProbability > 0f) {
+                if (freezeCounter > 0) {
+                    s = freezeHeldSample
+                    freezeCounter--
+                } else if (rng.nextFloat() < freezeProbability) {
+                    freezeHeldSample = s
+                    freezeCounter = freezeDurationSamples
+                }
+            }
+
+            // ── Stage 9f: Bit Scrambler (raw 16-bit data corruption) ──
+            var pcmOut = (s * 32767.0f).toInt().toShort()
+            if (bitScrambleEnabled && bitScrambleDepth > 0 && bitScrambleProbability > 0f) {
+                if (rng.nextFloat() < bitScrambleProbability) {
+                    var scrambled = pcmOut.toInt() and 0xFFFF
+                    for (bit in 0 until bitScrambleDepth.coerceAtMost(15)) {
+                        val pos = rng.nextInt(0, 15)
+                        scrambled = scrambled xor (1 shl pos)
+                    }
+                    pcmOut = scrambled.toShort()
+                }
+            }
+
+            // Stage 10: Save to output buffer
+            output[i] = pcmOut
         }
     }
 }

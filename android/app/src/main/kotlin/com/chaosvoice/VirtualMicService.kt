@@ -75,8 +75,10 @@ class VirtualMicService : Service() {
             sampleRateReduction  = (args["sampleRateReduction"] as? Int)                 ?: sampleRateReduction
             intensityPreset      = (args["intensityPreset"] as? String)                  ?: intensityPreset
 
-            // Mirror parameters to ChaosProjectionService
+            // Mirror parameters to ChaosProjectionService (including Chaos
+            // Overload stages so both engine paths stay in sync)
             ChaosProjectionService.applyParams(args)
+            ChaosProjectionService.applyChaosOverloadParams(args)
 
             Log.d(TAG, "V3 params applied: gain=$gainFactor, bits=$bitCrushDepth, ring=$ringModFreq, preset=$intensityPreset")
         }
@@ -165,6 +167,8 @@ class VirtualMicService : Service() {
         // Initialize stateful ChaosDSP engine
         dsp = ChaosDSP(SAMPLE_RATE.toFloat()).apply {
             reset()
+            // Bind so live Chaos Overload param updates reach this engine
+            ChaosProjectionService.bindLiveDsp(this)
         }
 
         val bufSize = maxOf(
